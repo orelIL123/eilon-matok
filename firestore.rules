@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    function isBarber() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBarber == true;
+    }
+    
+    // Users Collection
+    match /users/{userId} {
+      // Allow read for signed-in users OR for password reset check (queries only, not direct document access)
+      // This allows checking if a user exists by phone/email for password reset flow
+      // Direct document access requires sign-in, but queries (for password reset) are allowed
+      allow get: if isSignedIn(); // Direct document access requires sign-in
+      allow list: if true; // Allow queries for password reset check
+      allow create: if isSignedIn();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Barbers Collection
+    match /barbers/{barberId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Treatments Collection
+    match /treatments/{treatmentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Appointments Collection
+    match /appointments/{appointmentId} {
+      allow read: if isSignedIn() && 
+                     (isOwner(resource.data.clientId) || 
+                      isBarber() || 
+                      isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && 
+                       (isOwner(resource.data.clientId) || 
+                        isBarber() || 
+                        isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Waitlist Collection
+    match /waitlist/{waitlistId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isBarber() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Reviews Collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isOwner(resource.data.clientId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Gallery Collection
+    match /gallery/{imageId} {
+      allow read: if true;
+      // Allow write for signed-in users (for initialization) or admin/barber
+      allow create: if isSignedIn() || isBarber() || isAdmin();
+      allow update, delete: if isBarber() || isAdmin();
+    }
+
+    // Settings Collection (homeMessages, aboutUsText, popupMessage, images, etc.)
+    match /settings/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Availability Collection (weekly patterns - legacy, being phased out)
+    match /availability/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Daily Availability Collection (per-date schedules)
+    match /dailyAvailability/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Shop Items Collection
+    match /shopItems/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Scheduled Reminders Collection
+    match /scheduledReminders/{reminderId} {
+      allow read: if isAdmin() ||
+                  (isSignedIn() && request.auth.uid == resource.data.userId);
+      allow create: if isAdmin() ||
+                     (isSignedIn() && request.resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Business Settings
+    match /businessSettings/main {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && isOwner(resource.data.userId);
+      allow write: if isAdmin();
+    }
+
+    // Statistics
+    match /statistics/{statId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
+

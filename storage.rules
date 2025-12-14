@@ -1,0 +1,98 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    function isBarber() {
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isBarber == true;
+    }
+    
+    // Helper function to safely check admin status (with error handling)
+    function isAdminSafe() {
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    function isValidImage() {
+      return request.resource.size < 5 * 1024 * 1024 // 5MB
+             && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Profile images
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() 
+                      && request.auth.uid == userId 
+                      && isValidImage();
+    }
+    
+    // Gallery images - allow authenticated users to upload (admin screen)
+    match /gallery/{allPaths=**} {
+      allow read: if true;
+      // Allow authenticated admins to upload
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // Barber/Worker images
+    match /barbers/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isBarber() || isAdmin()) && isValidImage();
+    }
+    
+    match /workers/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isBarber() || isAdmin()) && isValidImage();
+    }
+    
+    // Backgrounds
+    match /backgrounds/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // Splash screens
+    match /splash/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // About Us images
+    match /aboutus/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+
+    // App images (settings-managed images, gallery, etc.)
+    match /app-images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // Shop images
+    match /shop/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // Treatment images
+    match /treatments/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+    }
+    
+    // Business assets
+    match /business/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdminSafe() && isValidImage();
+    }
+  }
+}

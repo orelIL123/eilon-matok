@@ -1,0 +1,17 @@
+{
+  "businessName": "eilon matok",
+  "totalEmployees": 1,
+  "employees": [
+    {
+      "name": "eilon matok",
+      "phone": "+972522210281",
+      "specialization": "תספורת כללית",
+      "experience": "לא צוין",
+      "isMainBarber": true,
+      "available": true,
+      "barberId": "barber_1",
+      "userId": "user_gal_shemesh_barber_1",
+      "phoneE164": "+972522210281"
+    }
+  ]
+}

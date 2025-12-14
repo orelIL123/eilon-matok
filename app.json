@@ -1,0 +1,87 @@
+{
+  "expo": {
+    "name": "eilon matok",
+    "slug": "eilon-matok",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "barberapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.eilonmatok.app",
+      "buildNumber": "1",
+      "googleServicesFile": "./app/GoogleService-Info.plist",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "האפליקציה זקוקה לגישה לתמונות כדי להעלות תמונות לגלריה",
+        "NSCameraUsageDescription": "האפליקציה זקוקה לגישה למצלמה כדי לצלם תמונות"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#E8E8E8"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.eilonmatok.app",
+      "googleServicesFile": "./app/google-services.json",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-notifications",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "האפליקציה זקוקה לגישה לתמונות כדי להעלות תמונות לגלריה",
+          "cameraPermission": "האפליקציה זקוקה לגישה למצלמה כדי לצלם תמונות"
+        }
+      ]
+    ],
+    "runtimeVersion": "1.0.0",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "518e7344-df67-42cd-8107-502bd3e48357"
+      }
+    },
+    "owner": "orel895",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#8B4513"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/518e7344-df67-42cd-8107-502bd3e48357"
+    }
+  }
+}

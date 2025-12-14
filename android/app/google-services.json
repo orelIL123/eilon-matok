@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "525402752082",
+    "project_id": "eilon-matok",
+    "storage_bucket": "eilon-matok.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525402752082:android:b6fdabec9ade6f8b2c8b8b",
+        "android_client_info": {
+          "package_name": "com.eilonnmaok.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7KlAbAUvvWWIlnpKXgDLOVxk5d76T8X8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

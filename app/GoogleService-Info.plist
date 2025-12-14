@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCoQt3Huw267keSJUJTxQ7muI8j6CHzUVw</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1007787228112</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.eilonmatok.app</string>
+	<key>PROJECT_ID</key>
+	<string>eilon-matok</string>
+	<key>STORAGE_BUCKET</key>
+	<string>eilon-matok.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1007787228112:ios:f4ce6e2bc522a0e4ffd7d5</string>
+</dict>
+</plist>
