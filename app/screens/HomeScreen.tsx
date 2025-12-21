@@ -5,20 +5,22 @@ import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'fi
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  ImageBackground,
-  InteractionManager,
-  Linking,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActionSheetIOS,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    ImageBackground,
+    InteractionManager,
+    Linking,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import NotificationPanel from '../components/NotificationPanel';
 import ScissorsLoader from '../components/ScissorsLoader';
@@ -507,20 +509,77 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     });
   };
 
-  const handleWaze = () => {
-    Linking.openURL('https://waze.com/ul?ll=31.3167,34.5833&navigate=yes').catch(() => {
-      Alert.alert(t('common.error'), t('errors.waze_error'));
-    });
+  // Address coordinates - באר שבע
+  const BUSINESS_ADDRESS = 'באר שבע, ישראל';
+  const BUSINESS_LAT = 31.2433; // Be'er Sheva coordinates
+  const BUSINESS_LON = 34.7915;
+
+  const handleNavigate = () => {
+    // For iOS, show ActionSheet with all options
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['ביטול', 'Apple Maps', 'Google Maps', 'Waze'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            // Apple Maps
+            const url = `http://maps.apple.com/?daddr=${BUSINESS_LAT},${BUSINESS_LON}&dirflg=d`;
+            Linking.openURL(url).catch(() => {
+              Alert.alert(t('common.error'), 'לא ניתן לפתוח את Apple Maps');
+            });
+          } else if (buttonIndex === 2) {
+            // Google Maps
+            const url = `https://www.google.com/maps/search/?api=1&query=${BUSINESS_LAT},${BUSINESS_LON}`;
+            Linking.openURL(url).catch(() => {
+              Alert.alert(t('common.error'), 'לא ניתן לפתוח את Google Maps');
+            });
+          } else if (buttonIndex === 3) {
+            // Waze
+            const url = `https://waze.com/ul?ll=${BUSINESS_LAT},${BUSINESS_LON}&navigate=yes`;
+            Linking.openURL(url).catch(() => {
+              Alert.alert(t('common.error'), 'לא ניתן לפתוח את Waze');
+            });
+          }
+        }
+      );
+    } else {
+      // For Android, show Alert with options
+      Alert.alert(
+        'בחר אפליקציית מפות',
+        'איך תרצה לנווט?',
+        [
+          { text: 'ביטול', style: 'cancel' },
+          {
+            text: 'Google Maps',
+            onPress: () => {
+              const url = `https://www.google.com/maps/search/?api=1&query=${BUSINESS_LAT},${BUSINESS_LON}`;
+              Linking.openURL(url).catch(() => {
+                Alert.alert(t('common.error'), 'לא ניתן לפתוח את Google Maps');
+              });
+            },
+          },
+          {
+            text: 'Waze',
+            onPress: () => {
+              const url = `https://waze.com/ul?ll=${BUSINESS_LAT},${BUSINESS_LON}&navigate=yes`;
+              Linking.openURL(url).catch(() => {
+                Alert.alert(t('common.error'), 'לא ניתן לפתוח את Waze');
+              });
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   const handleSocialMedia = (platform: string) => {
     let url = '';
     switch (platform) {
-      case 'facebook':
-        url = 'https://www.facebook.com/eilonmatokbarber';
-        break;
       case 'instagram':
-        url = 'https://www.instagram.com/gal.shemesh.official?igsh=MWhnajBmZG1xb2s5Zg==';
+        url = 'https://www.instagram.com/eilonmatok7?igsh=MWlwaDl4cjRocWFpbQ==';
         break;
       default:
         return;
@@ -738,7 +797,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                     <TouchableOpacity
                       key={index}
                       onPress={() => {
-                        const imageUrl = typeof img === 'string' ? img : img.uri;
+                        const imageUrl = typeof img === 'string' ? img : (img as any).uri || img;
                         setSelectedImage(imageUrl);
                         setShowImageModal(true);
                       }}
@@ -790,7 +849,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                 </Text>
                 <TouchableOpacity
                   style={styles.wazeButton}
-                  onPress={handleWaze}
+                  onPress={handleNavigate}
                 >
                   <Text style={styles.wazeButtonText}>{t('home.navigate_waze')}</Text>
                 </TouchableOpacity>
@@ -816,22 +875,22 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             </View>
 
             <View style={styles.socialRow}>
-              <TouchableOpacity onPress={() => handleSocialMedia('facebook')} style={styles.socialButton}>
-                <Ionicons name="logo-facebook" size={28} color="#1877f2" />
-              </TouchableOpacity>
               <TouchableOpacity onPress={() => handleSocialMedia('instagram')} style={styles.socialButton}>
                 <Ionicons name="logo-instagram" size={28} color="#e4405f" />
               </TouchableOpacity>
             </View>
           </Animated.View>
 
-          {/* Footer */}
+          {/* Footer - without location / Waze */}
           <View style={styles.footerCard}>
-            <Text style={styles.footerText}>מושב יושיביה 1</Text>
-            <TouchableOpacity onPress={handleWaze}>
-              <Text style={styles.footerWaze}>{t('home.navigate_waze')}</Text>
+            <TouchableOpacity onPress={() => {
+              const whatsappUrl = `https://wa.me/972523985505`;
+              Linking.openURL(whatsappUrl).catch(() => {
+                Alert.alert(t('common.error'), 'לא ניתן לפתוח את WhatsApp');
+              });
+            }}>
+              <Text style={styles.footerCredit}>{t('home.powered_by')}</Text>
             </TouchableOpacity>
-            <Text style={styles.footerCredit}>{t('home.powered_by')}</Text>
             <TouchableOpacity onPress={() => setShowTerms(true)}>
               <Text style={styles.footerTerms}>{t('home.terms')}</Text>
             </TouchableOpacity>

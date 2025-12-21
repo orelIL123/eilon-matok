@@ -3,31 +3,31 @@ import * as ImagePicker from 'expo-image-picker';
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import {
-    addGalleryImage,
-    addShopItem,
-    deleteGalleryImage,
-    deleteShopItem,
-    GalleryImage,
-    getAllStorageImages,
-    getGalleryImages,
-    getShopItems,
-    initializeGalleryImages,
-    ShopItem,
-    updateShopItem,
-    uploadImageToStorage
+  addGalleryImage,
+  addShopItem,
+  deleteGalleryImage,
+  deleteShopItem,
+  GalleryImage,
+  getAllStorageImages,
+  getGalleryImages,
+  getShopItems,
+  initializeGalleryImages,
+  ShopItem,
+  updateShopItem,
+  uploadImageToStorage
 } from '../../services/firebase';
 import ScissorsLoader from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
@@ -321,9 +321,14 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       });
       
       showToast('התמונה הועלתה בהצלחה', 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      showToast('שגיאה בהעלאת התמונה', 'error');
+      const errorMessage = error?.message || 'שגיאה בהעלאת התמונה';
+      if (errorMessage.includes('אין הרשאה') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+        showToast('אין הרשאה להעלות תמונות. אנא וודא שאתה מחובר כמנהל.', 'error');
+      } else {
+        showToast(errorMessage, 'error');
+      }
     }
   };
 
@@ -913,8 +918,8 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                         <Text style={styles.imageStatus}>פעיל</Text>
                       </View>
                       <View style={styles.imageActions}>
-                        <TouchableOpacity 
-                          style={styles.actionButton}
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.addToGalleryButton]}
                           onPress={() => {
                             setFormData({
                               imageUrl: imageUrl,
@@ -924,8 +929,45 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                             setModalVisible(true);
                           }}
                         >
-                          <Ionicons name="add-circle" size={20} color="#007bff" />
-                          <Text style={styles.actionButtonText}>הוסף לגלריה</Text>
+                          <Ionicons name="add-circle" size={18} color="#007bff" />
+                          <Text style={[styles.actionButtonText, { fontSize: 14 }]}>הוסף לגלריה</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.deleteStorageButton, styles.deleteButtonCompact]}
+                          onPress={() => {
+                            Alert.alert(
+                              'מחיקת תמונה',
+                              'האם אתה בטוח שברצונך למחוק תמונה זו מ-Firebase Storage? פעולה זו אינה ניתנת לביטול.',
+                              [
+                                { text: 'ביטול', style: 'cancel' },
+                                {
+                                  text: 'מחק',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      showToast('מוחק תמונה...', 'success');
+                                      const { deleteObject, ref } = await import('firebase/storage');
+                                      const { storage } = await import('../../config/firebase');
+                                      const imageRef = ref(storage, imageUrl);
+                                      await deleteObject(imageRef);
+                                      showToast('התמונה נמחקה בהצלחה מ-Storage', 'success');
+
+                                      // Reload storage images
+                                      const storageImagesData = await getAllStorageImages();
+                                      setStorageImages(storageImagesData);
+                                    } catch (error: any) {
+                                      console.error('Error deleting from storage:', error);
+                                      showToast('שגיאה במחיקת התמונה מ-Storage', 'error');
+                                    }
+                                  }
+                                }
+                              ]
+                            );
+                          }}
+                        >
+                          <Ionicons name="trash" size={18} color="#fff" />
+                          <Text style={styles.deleteStorageButtonText}>מחק</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1639,11 +1681,19 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  addToGalleryButton: {
+    flex: 1,
+    marginBottom: 0,
+    marginRight: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+  },
   actionButtonText: {
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   cancelButton: {
     backgroundColor: '#f8f9fa',
@@ -1728,8 +1778,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     left: 8,
+    right: 8,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 4,
   },
   reorderButton: {
     backgroundColor: 'rgba(0, 123, 255, 0.1)',
@@ -1753,6 +1807,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(220, 53, 69, 0.1)',
     borderRadius: 20,
     padding: 8,
+  },
+  deleteStorageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+    shadowColor: '#dc3545',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deleteButtonCompact: {
+    flex: 1,
+    marginTop: 0,
+    marginLeft: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+  },
+  deleteStorageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
 });
 

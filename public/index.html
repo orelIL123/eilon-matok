@@ -107,6 +107,27 @@
             text-decoration: underline;
         }
 
+        .nav-links {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .nav-links a {
+            margin: 0 15px;
+            color: #8B4513;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
+            .nav-links a {
+                display: block;
+                margin: 10px 0;
+            }
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -124,8 +145,15 @@
 </head>
 <body>
     <div class="container">
+        <div class="nav-links">
+            <a href="index.html">מדיניות פרטיות</a> |
+            <a href="terms-of-service.html">תנאי שימוש</a> |
+            <a href="support.html">תמיכה</a> |
+            <a href="privacy-policy-en.html">English</a>
+        </div>
+
         <h1>מדיניות פרטיות</h1>
-        <div class="app-name">אפליקציית eilon matok - מספרה</div>
+        <div class="app-name">אפליקציית אילון מתוק - מספרה</div>
         <div class="last-updated">עדכון אחרון: דצמבר 2024</div>
 
         <div class="highlight">

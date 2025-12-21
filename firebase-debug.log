@@ -1,0 +1,590 @@
+[debug] [2025-12-14T18:29:06.415Z] ----------------------------------------------------------------------
+[debug] [2025-12-14T18:29:06.423Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only hosting
+[debug] [2025-12-14T18:29:06.423Z] CLI Version:   14.25.1
+[debug] [2025-12-14T18:29:06.423Z] Platform:      darwin
+[debug] [2025-12-14T18:29:06.423Z] Node Version:  v24.4.1
+[debug] [2025-12-14T18:29:06.423Z] Time:          Sun Dec 14 2025 20:29:06 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-14T18:29:06.424Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-14T18:29:06.658Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-14T18:29:06.659Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-14T18:29:06.659Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-12-14T18:29:06.661Z] Checked if tokens are valid: false, expires at: 1765716809817
+[debug] [2025-12-14T18:29:06.661Z] Checked if tokens are valid: false, expires at: 1765716809817
+[debug] [2025-12-14T18:29:06.662Z] > refreshing access token with scopes: []
+[debug] [2025-12-14T18:29:06.664Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-14T18:29:06.664Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-14T18:29:06.897Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-14T18:29:06.897Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-14T18:29:06.912Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-14T18:29:06.912Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-14T18:29:06.913Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-12-14T18:29:07.861Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-14T18:29:07.862Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-12-14T18:29:07.863Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:07.863Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:07.863Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/eilon-matok [none]
+[debug] [2025-12-14T18:29:08.278Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/eilon-matok 200
+[debug] [2025-12-14T18:29:08.279Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/eilon-matok {"projectId":"eilon-matok","projectNumber":"525402752082","displayName":"eilon matok","name":"projects/eilon-matok","resources":{"hostingSite":"eilon-matok"},"state":"ACTIVE","etag":"1_36383477-07ba-48e2-b946-cfa6805cba11"}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2025-12-14T18:29:08.288Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:08.288Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:08.288Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions [none]
+[debug] [2025-12-14T18:29:08.289Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-12-14T18:29:10.082Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions 200
+[debug] [2025-12-14T18:29:10.082Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions {"name":"projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[eilon-matok]: beginning deploy... 
+[info] i  hosting[eilon-matok]: found 6 files in public 
+[debug] [2025-12-14T18:29:10.096Z] [hosting] uploading with 200 concurrency
+[debug] [2025-12-14T18:29:10.106Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.107Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.107Z] [hosting] hash cache [cHVibGlj] stored for 6 files
+[debug] [2025-12-14T18:29:10.108Z] [hosting][hash queue][FINAL] {"max":7,"min":5,"avg":5.5,"active":0,"complete":6,"success":6,"errored":0,"retried":0,"total":6,"elapsed":10}
+[debug] [2025-12-14T18:29:10.108Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56:populateFiles [none]
+[debug] [2025-12-14T18:29:10.108Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56:populateFiles {"files":{"/privacy-policy-en.html":"57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906","/terms-of-service-en.html":"c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d","/index.html":"7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458","/support-en.html":"9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf","/terms-of-service.html":"983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe","/support.html":"200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6"}}
+[debug] [2025-12-14T18:29:10.342Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56:populateFiles 200
+[debug] [2025-12-14T18:29:10.343Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56:populateFiles {"uploadRequiredHashes":["57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906","c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d","7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458","9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf","983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe","200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files"}
+[debug] [2025-12-14T18:29:10.343Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.343Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.344Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.344Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.345Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.345Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.345Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.345Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.345Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.346Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.346Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.346Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:10.346Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906 [none]
+[debug] [2025-12-14T18:29:10.346Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906 [stream]
+[debug] [2025-12-14T18:29:10.348Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d [none]
+[debug] [2025-12-14T18:29:10.348Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d [stream]
+[debug] [2025-12-14T18:29:10.349Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458 [none]
+[debug] [2025-12-14T18:29:10.350Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458 [stream]
+[debug] [2025-12-14T18:29:10.351Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf [none]
+[debug] [2025-12-14T18:29:10.351Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf [stream]
+[debug] [2025-12-14T18:29:10.354Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe [none]
+[debug] [2025-12-14T18:29:10.354Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe [stream]
+[debug] [2025-12-14T18:29:10.355Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6 [none]
+[debug] [2025-12-14T18:29:10.355Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6 [stream]
+[debug] [2025-12-14T18:29:10.357Z] [hosting][populate queue][FINAL] {"max":240,"min":240,"avg":240,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":251}
+[debug] [2025-12-14T18:29:10.357Z] [hosting] uploads queued: 6
+[debug] [2025-12-14T18:29:11.537Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d 200
+[debug] [2025-12-14T18:29:11.537Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/c026f79ae1bcce1bb3669660de764d7ee44c7ebb853f2c7669b7efe66a35186d [stream]
+[debug] [2025-12-14T18:29:11.571Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906 200
+[debug] [2025-12-14T18:29:11.571Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/57e7e8c1c85c295222469576ffd729d7a9e32f2940f97488e641a829501e0906 [stream]
+[debug] [2025-12-14T18:29:11.674Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe 200
+[debug] [2025-12-14T18:29:11.675Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/983db5ca964922744160f54c2c39cc7951d8bc42c3b349d4d300dcde5b1f23fe [stream]
+[debug] [2025-12-14T18:29:11.815Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf 200
+[debug] [2025-12-14T18:29:11.815Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/9693d6ec402e1e0be37ab4c7844396b300804fe8e07b4801590eab3b6d42edcf [stream]
+[info] i  hosting: uploading new files [4/6] (66%) 
+[debug] [2025-12-14T18:29:12.127Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6 200
+[debug] [2025-12-14T18:29:12.127Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/200b7c7c50b496b4dfb377bf51eaa82ce6c0fd7306f905d0691a6c12669575e6 [stream]
+[debug] [2025-12-14T18:29:12.205Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458 200
+[debug] [2025-12-14T18:29:12.206Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/eilon-matok/versions/6a390b64207f2a56/files/7688cf82c514042bdee64e4a116641602d9fdee750f9195d07486f88f585e458 [stream]
+[debug] [2025-12-14T18:29:12.206Z] [hosting][upload queue][FINAL] {"max":1862,"min":1193,"avg":1477.5,"active":0,"complete":6,"success":6,"errored":0,"retried":0,"total":6,"elapsed":1863}
+[info] i  hosting: upload complete 
+[info] ✔  hosting[eilon-matok]: file upload complete 
+[debug] [2025-12-14T18:29:12.206Z] [hosting] deploy completed after 2120ms
+[debug] [2025-12-14T18:29:12.207Z] [
+  {
+    "config": {
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "site": "eilon-matok"
+    },
+    "version": "projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56"
+  }
+]
+[info] i  hosting[eilon-matok]: finalizing version... 
+[debug] [2025-12-14T18:29:12.208Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:12.208Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:12.208Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions/6a390b64207f2a56 updateMask=status%2Cconfig
+[debug] [2025-12-14T18:29:12.208Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions/6a390b64207f2a56 {"status":"FINALIZED","config":{}}
+[debug] [2025-12-14T18:29:12.438Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions/6a390b64207f2a56 200
+[debug] [2025-12-14T18:29:12.438Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/versions/6a390b64207f2a56 {"name":"projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56","status":"FINALIZED","config":{},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-12-14T18:29:09.482633Z","createUser":{"email":"orel895@gmail.com"},"finalizeTime":"2025-12-14T18:29:12.501546Z","finalizeUser":{"email":"orel895@gmail.com"}}
+[debug] [2025-12-14T18:29:12.438Z] [hosting] finalized version for eilon-matok:[object Object]
+[info] ✔  hosting[eilon-matok]: version finalized 
+[info] i  hosting[eilon-matok]: releasing new version... 
+[debug] [2025-12-14T18:29:12.439Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:12.439Z] Checked if tokens are valid: true, expires at: 1765740545898
+[debug] [2025-12-14T18:29:12.439Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/channels/live/releases versionName=projects%2F525402752082%2Fsites%2Feilon-matok%2Fversions%2F6a390b64207f2a56
+[debug] [2025-12-14T18:29:12.439Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/channels/live/releases {}
+[debug] [2025-12-14T18:29:12.717Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/channels/live/releases 200
+[debug] [2025-12-14T18:29:12.717Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/eilon-matok/channels/live/releases {"name":"projects/525402752082/sites/eilon-matok/channels/live/releases/1765736952234000","version":{"name":"projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56","status":"FINALIZED","config":{},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-12-14T18:29:09.482633Z","createUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"},"finalizeTime":"2025-12-14T18:29:12.501546Z","finalizeUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"}},"type":"DEPLOY","releaseTime":"2025-12-14T18:29:12.234Z","releaseUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"}}
+[debug] [2025-12-14T18:29:12.717Z] [hosting] release: {"name":"projects/525402752082/sites/eilon-matok/channels/live/releases/1765736952234000","version":{"name":"projects/525402752082/sites/eilon-matok/versions/6a390b64207f2a56","status":"FINALIZED","config":{},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-12-14T18:29:09.482633Z","createUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"},"finalizeTime":"2025-12-14T18:29:12.501546Z","finalizeUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"}},"type":"DEPLOY","releaseTime":"2025-12-14T18:29:12.234Z","releaseUser":{"email":"orel895@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocJDtRsIbL9UKrC5PXi92gK0mrcsfhzUgFs8ERhtFMPnevphmy4=mo"}}
+[info] ✔  hosting[eilon-matok]: release complete 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[info] Hosting URL: https://eilon-matok.web.app
+[debug] [2025-12-21T08:28:27.052Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:28:27.059Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:28:27.059Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:28:27.059Z] Platform:      darwin
+[debug] [2025-12-21T08:28:27.060Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:28:27.060Z] Time:          Sun Dec 21 2025 10:28:27 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:28:27.060Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:28:27.061Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-12-21T08:28:27.184Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:28:27.185Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:28:27.185Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:28:27.185Z] Checked if tokens are valid: false, expires at: 1766144284318
+[debug] [2025-12-21T08:28:27.185Z] Checked if tokens are valid: false, expires at: 1766144284318
+[debug] [2025-12-21T08:28:27.185Z] > refreshing access token with scopes: []
+[debug] [2025-12-21T08:28:27.186Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-21T08:28:27.187Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-21T08:28:27.489Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-21T08:28:27.490Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-21T08:28:27.510Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:28:27.510Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:28:27.510Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:28:27.605Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-12-21T08:28:27.605Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2025-12-21T08:28:28.656Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:28:28.657Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:28:28.663Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:28.663Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:28.663Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:28:29.489Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:28:29.489Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:28:29.492Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:29.493Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:29.493Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:28:29.493Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:28:30.476Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:28:30.476Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:28:30.478Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:30.478Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:30.479Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:28:31.213Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:28:31.213Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-14T11:53:37.637857Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-14T11:53:51.219198Z"}]}
+[debug] [2025-12-21T08:28:31.231Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:31.231Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:31.231Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [none]
+[debug] [2025-12-21T08:28:31.966Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 200
+[debug] [2025-12-21T08:28:31.967Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [omitted]
+[info] i  storage: latest version of storage.rules already up to date, skipping upload... 
+[debug] [2025-12-21T08:28:31.970Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629
+[debug] [2025-12-21T08:28:31.971Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:31.971Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:28:31.971Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:28:31.971Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629"}}
+[debug] [2025-12-21T08:28:32.565Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:28:32.566Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:28:32.703961Z"}
+[debug] [2025-12-21T08:28:32.566Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:44:21.059Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:44:21.062Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:44:21.063Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:44:21.063Z] Platform:      darwin
+[debug] [2025-12-21T08:44:21.063Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:44:21.063Z] Time:          Sun Dec 21 2025 10:44:21 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:44:21.063Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:44:21.192Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:44:21.193Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:44:21.193Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:44:21.194Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:21.194Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:21.195Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:44:21.196Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:44:21.196Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:44:22.341Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:44:22.341Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:44:22.343Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:22.343Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:22.343Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:44:23.003Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:44:23.003Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:44:23.004Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:23.004Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:23.004Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:44:23.005Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:44:23.949Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:44:23.949Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:44:23.950Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:23.950Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:23.950Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:44:24.652Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:44:24.652Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-14T11:53:37.637857Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:28:32.703961Z"}]}
+[debug] [2025-12-21T08:44:24.666Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:24.666Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:24.666Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [none]
+[debug] [2025-12-21T08:44:25.383Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 200
+[debug] [2025-12-21T08:44:25.383Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [omitted]
+[info] i  storage: latest version of storage.rules already up to date, skipping upload... 
+[debug] [2025-12-21T08:44:25.384Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629
+[debug] [2025-12-21T08:44:25.384Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:25.384Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:44:25.384Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:44:25.384Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629"}}
+[debug] [2025-12-21T08:44:26.279Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:44:26.279Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:44:26.396612Z"}
+[debug] [2025-12-21T08:44:26.279Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:47:27.944Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:47:27.947Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only firestore:rules
+[debug] [2025-12-21T08:47:27.947Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:47:27.947Z] Platform:      darwin
+[debug] [2025-12-21T08:47:27.947Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:47:27.947Z] Time:          Sun Dec 21 2025 10:47:27 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:47:27.947Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:47:28.042Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:47:28.043Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:47:28.043Z] [iam] checking project eilon-matok for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2025-12-21T08:47:28.043Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:28.043Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:28.044Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:47:28.045Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:47:28.045Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2025-12-21T08:47:29.102Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:47:29.102Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2025-12-21T08:47:29.106Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:29.106Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:29.106Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/eilon-matok/databases/(default) [none]
+[debug] [2025-12-21T08:47:29.679Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/eilon-matok/databases/(default) 200
+[debug] [2025-12-21T08:47:29.679Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/eilon-matok/databases/(default) {"name":"projects/eilon-matok/databases/(default)","uid":"ae55ce18-4767-4969-a614-4b150af5cfe9","createTime":"2025-12-14T09:59:47.595815Z","updateTime":"2025-12-14T09:59:47.595815Z","locationId":"europe-west1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2025-12-21T07:47:29.877074Z","appEngineIntegrationMode":"DISABLED","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IObQ5+KlzpEDMIjH9KKCvZED"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2025-12-21T08:47:29.681Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:29.681Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:29.681Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:47:29.681Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:47:30.535Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:47:30.536Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2025-12-21T08:47:30.537Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:30.537Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:30.538Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:47:31.232Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:47:31.233Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-14T11:53:37.637857Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:44:26.396612Z"}]}
+[debug] [2025-12-21T08:47:31.263Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:31.263Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:31.263Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1 [none]
+[debug] [2025-12-21T08:47:31.987Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1 200
+[debug] [2025-12-21T08:47:31.987Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/1c961a48-ee50-44f0-9dd2-117abc9253d1 [omitted]
+[info] i  firestore: uploading rules firestore.rules... 
+[debug] [2025-12-21T08:47:31.988Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:31.988Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:31.989Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [none]
+[debug] [2025-12-21T08:47:31.989Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [omitted]
+[debug] [2025-12-21T08:47:32.831Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets 200
+[debug] [2025-12-21T08:47:32.831Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets {"name":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","source":{"files":[{"content":"rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    \n    // Helper functions\n    function isSignedIn() {\n      return request.auth != null;\n    }\n    \n    function isOwner(userId) {\n      return request.auth.uid == userId;\n    }\n    \n    function isAdmin() {\n      return isSignedIn() && \n             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n    \n    function isBarber() {\n      return isSignedIn() && \n             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBarber == true;\n    }\n    \n    // Users Collection\n    match /users/{userId} {\n      // Allow read for signed-in users OR for password reset check (queries only, not direct document access)\n      // This allows checking if a user exists by phone/email for password reset flow\n      // Also allow reads by Storage rules (they use firestore.get() internally)\n      // Direct document access requires sign-in, but queries (for password reset) are allowed\n      allow get: if true; // Allow reads - needed for Storage rules to check admin status\n      allow list: if true; // Allow queries for password reset check\n      allow create: if isSignedIn();\n      allow update: if isOwner(userId) || isAdmin();\n      allow delete: if isAdmin();\n    }\n    \n    // Barbers Collection\n    match /barbers/{barberId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n    \n    // Treatments Collection\n    match /treatments/{treatmentId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n    \n    // Appointments Collection\n    match /appointments/{appointmentId} {\n      allow read: if isSignedIn() && \n                     (isOwner(resource.data.clientId) || \n                      isBarber() || \n                      isAdmin());\n      allow create: if isSignedIn();\n      allow update: if isSignedIn() && \n                       (isOwner(resource.data.clientId) || \n                        isBarber() || \n                        isAdmin());\n      allow delete: if isAdmin();\n    }\n    \n    // Waitlist Collection\n    match /waitlist/{waitlistId} {\n      allow read: if isSignedIn();\n      allow create: if isSignedIn();\n      allow update: if isBarber() || isAdmin();\n      allow delete: if isAdmin();\n    }\n    \n    // Reviews Collection\n    match /reviews/{reviewId} {\n      allow read: if true;\n      allow create: if isSignedIn();\n      allow update: if isOwner(resource.data.clientId) || isAdmin();\n      allow delete: if isAdmin();\n    }\n    \n    // Gallery Collection\n    match /gallery/{imageId} {\n      allow read: if true;\n      // Allow write for signed-in users (for initialization) or admin/barber\n      allow create: if isSignedIn() || isBarber() || isAdmin();\n      allow update, delete: if isBarber() || isAdmin();\n    }\n\n    // Settings Collection (homeMessages, aboutUsText, popupMessage, images, etc.)\n    match /settings/{documentId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n\n    // Availability Collection (weekly patterns - legacy, being phased out)\n    match /availability/{documentId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n\n    // Daily Availability Collection (per-date schedules)\n    match /dailyAvailability/{documentId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n\n    // Shop Items Collection\n    match /shopItems/{itemId} {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n\n    // Scheduled Reminders Collection\n    match /scheduledReminders/{reminderId} {\n      allow read: if isAdmin() ||\n                  (isSignedIn() && request.auth.uid == resource.data.userId);\n      allow create: if isAdmin() ||\n                     (isSignedIn() && request.resource.data.userId == request.auth.uid);\n      allow update, delete: if isAdmin();\n    }\n\n    // Business Settings\n    match /businessSettings/main {\n      allow read: if true;\n      allow write: if isAdmin();\n    }\n\n    // Notifications\n    match /notifications/{notificationId} {\n      allow read: if isSignedIn() && isOwner(resource.data.userId);\n      allow write: if isAdmin();\n    }\n\n    // Statistics\n    match /statistics/{statId} {\n      allow read: if isAdmin();\n      allow write: if isAdmin();\n    }\n  }\n}\n\n","name":"firestore.rules"}]},"createTime":"2025-12-21T08:47:32.955999Z","metadata":{"services":["cloud.firestore"]}}
+[debug] [2025-12-21T08:47:32.831Z] [rules] created ruleset projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262
+[debug] [2025-12-21T08:47:32.831Z] [rules] releasing cloud.firestore/(default) with ruleset projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262
+[debug] [2025-12-21T08:47:32.831Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:32.831Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:47:32.831Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/cloud.firestore/(default) [none]
+[debug] [2025-12-21T08:47:32.831Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/cloud.firestore/(default) {"release":{"name":"projects/eilon-matok/releases/cloud.firestore/(default)","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262"}}
+[debug] [2025-12-21T08:47:33.755Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/cloud.firestore/(default) 200
+[debug] [2025-12-21T08:47:33.755Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/cloud.firestore/(default) {"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-21T08:47:33.882518Z"}
+[debug] [2025-12-21T08:47:33.755Z] [rules] updated release projects/eilon-matok/releases/cloud.firestore
+[info] ✔  firestore: released rules firestore.rules to cloud.firestore 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:50:24.630Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:50:24.633Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:50:24.633Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:50:24.633Z] Platform:      darwin
+[debug] [2025-12-21T08:50:24.633Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:50:24.633Z] Time:          Sun Dec 21 2025 10:50:24 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:50:24.633Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:50:24.739Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:50:24.740Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:50:24.740Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:50:24.740Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:24.740Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:24.741Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:50:24.741Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:50:24.741Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:50:25.787Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:50:25.787Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:50:25.789Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:25.789Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:25.790Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:50:26.565Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:50:26.565Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:50:26.567Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:26.567Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:26.567Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:50:26.567Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:50:27.437Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:50:27.437Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {"issues":[{"sourcePosition":{"fileName":"storage.rules","line":11,"column":14,"currentOffset":226,"endOffset":231},"description":"Invalid function name: exists.","severity":"WARNING"},{"sourcePosition":{"fileName":"storage.rules","line":17,"column":14,"currentOffset":484,"endOffset":489},"description":"Invalid function name: exists.","severity":"WARNING"},{"sourcePosition":{"fileName":"storage.rules","line":24,"column":14,"currentOffset":820,"endOffset":825},"description":"Invalid function name: exists.","severity":"WARNING"}]}
+[warn] ⚠  [W] 11:14 - Invalid function name: exists. 
+[warn] ⚠  [W] 17:14 - Invalid function name: exists. 
+[warn] ⚠  [W] 24:14 - Invalid function name: exists. 
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:50:27.439Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:27.440Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:27.440Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:50:27.790Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:50:27.791Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-21T08:47:33.882518Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:44:26.396612Z"}]}
+[debug] [2025-12-21T08:50:27.799Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:27.800Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:27.800Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [none]
+[debug] [2025-12-21T08:50:28.139Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 200
+[debug] [2025-12-21T08:50:28.139Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/b5e4a6d5-142e-4d3b-8bd9-fd066dcf9629 [omitted]
+[info] i  storage: uploading rules storage.rules... 
+[debug] [2025-12-21T08:50:28.141Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:28.141Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:28.141Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [none]
+[debug] [2025-12-21T08:50:28.141Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [omitted]
+[debug] [2025-12-21T08:50:28.978Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets 200
+[debug] [2025-12-21T08:50:28.979Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets {"name":"projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f","source":{"files":[{"content":"rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    \n    function isSignedIn() {\n      return request.auth != null;\n    }\n    \n    function isAdmin() {\n      return request.auth != null &&\n             exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    function isBarber() {\n      return request.auth != null &&\n             exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isBarber == true;\n    }\n\n    // Helper function to safely check admin status (with error handling)\n    function isAdminSafe() {\n      return request.auth != null &&\n             exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    // Allow specific known admin UID (Eilon) - FALLBACK\n    function isKnownAdmin() {\n      return request.auth != null &&\n             request.auth.uid == '6XVviL49bMdNtCsQ1JuXRnD1qao1';\n    }\n    \n    function isValidImage() {\n      return request.resource.size < 5 * 1024 * 1024 // 5MB\n             && request.resource.contentType.matches('image/.*');\n    }\n    \n    // Profile images\n    match /profiles/{userId}/{allPaths=**} {\n      allow read: if true;\n      allow write: if isSignedIn() \n                      && request.auth.uid == userId \n                      && isValidImage();\n    }\n    \n    // Gallery images - allow authenticated users to upload (admin screen)\n    match /gallery/{allPaths=**} {\n      allow read: if true;\n      // Allow authenticated admins to upload (with fallback to known admin UID)\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n    \n    // Barber/Worker images\n    match /barbers/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    match /workers/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Backgrounds\n    match /backgrounds/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Splash screens\n    match /splash/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // About Us images\n    match /aboutus/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // App images (settings-managed images, gallery, etc.)\n    match /app-images/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Shop images\n    match /shop/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Treatment images\n    match /treatments/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Business assets\n    match /business/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdminSafe() || isKnownAdmin()) && isValidImage();\n    }\n  }\n}","name":"storage.rules"}]},"createTime":"2025-12-21T08:50:29.114687Z","metadata":{"services":["firebase.storage"]}}
+[debug] [2025-12-21T08:50:28.979Z] [rules] created ruleset projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f
+[debug] [2025-12-21T08:50:28.979Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f
+[debug] [2025-12-21T08:50:28.979Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:28.979Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:28.980Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:50:28.980Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f"}}
+[debug] [2025-12-21T08:50:29.875Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:50:29.875Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:50:29.998534Z"}
+[debug] [2025-12-21T08:50:29.875Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:50:56.346Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:50:56.348Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:50:56.348Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:50:56.348Z] Platform:      darwin
+[debug] [2025-12-21T08:50:56.348Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:50:56.348Z] Time:          Sun Dec 21 2025 10:50:56 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:50:56.349Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:50:56.446Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:50:56.446Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:50:56.447Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:50:56.447Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:56.447Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:56.448Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:50:56.448Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:50:56.448Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:50:57.695Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:50:57.695Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:50:57.699Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:57.699Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:57.699Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:50:58.407Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:50:58.407Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:50:58.409Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:58.409Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:58.409Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:50:58.409Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:50:59.280Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:50:59.280Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:50:59.282Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:59.282Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:50:59.282Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:50:59.996Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:50:59.996Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-21T08:47:33.882518Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:50:29.998534Z"}]}
+[debug] [2025-12-21T08:51:00.012Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:00.012Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:00.012Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f [none]
+[debug] [2025-12-21T08:51:00.737Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f 200
+[debug] [2025-12-21T08:51:00.737Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/6e0794dd-d89f-41e1-b366-961802bdfe2f [omitted]
+[info] i  storage: uploading rules storage.rules... 
+[debug] [2025-12-21T08:51:00.739Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:00.739Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:00.739Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [none]
+[debug] [2025-12-21T08:51:00.739Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [omitted]
+[debug] [2025-12-21T08:51:01.625Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets 200
+[debug] [2025-12-21T08:51:01.625Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets {"name":"projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55","source":{"files":[{"content":"rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    \n    function isSignedIn() {\n      return request.auth != null;\n    }\n    \n    function isAdmin() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    function isBarber() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isBarber == true;\n    }\n\n    // Helper function to safely check admin status (with error handling)\n    function isAdminSafe() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    // Allow specific known admin UID (Eilon) - FALLBACK\n    function isKnownAdmin() {\n      return request.auth != null &&\n             request.auth.uid == '6XVviL49bMdNtCsQ1JuXRnD1qao1';\n    }\n    \n    function isValidImage() {\n      return request.resource.size < 5 * 1024 * 1024 // 5MB\n             && request.resource.contentType.matches('image/.*');\n    }\n    \n    // Profile images\n    match /profiles/{userId}/{allPaths=**} {\n      allow read: if true;\n      allow write: if isSignedIn() \n                      && request.auth.uid == userId \n                      && isValidImage();\n    }\n    \n    // Gallery images - allow authenticated users to upload (admin screen)\n    match /gallery/{allPaths=**} {\n      allow read: if true;\n      // Allow authenticated admins to upload (with fallback to known admin UID)\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n    \n    // Barber/Worker images\n    match /barbers/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    match /workers/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Backgrounds\n    match /backgrounds/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Splash screens\n    match /splash/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // About Us images\n    match /aboutus/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // App images (settings-managed images, gallery, etc.)\n    match /app-images/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Shop images\n    match /shop/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Treatment images\n    match /treatments/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdmin() || isKnownAdmin()) && isValidImage();\n    }\n\n    // Business assets\n    match /business/{allPaths=**} {\n      allow read: if true;\n      allow write: if (isAdminSafe() || isKnownAdmin()) && isValidImage();\n    }\n  }\n}","name":"storage.rules"}]},"createTime":"2025-12-21T08:51:01.700175Z","metadata":{"services":["firebase.storage"]}}
+[debug] [2025-12-21T08:51:01.625Z] [rules] created ruleset projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55
+[debug] [2025-12-21T08:51:01.625Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55
+[debug] [2025-12-21T08:51:01.625Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:01.625Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:51:01.625Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:51:01.626Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55"}}
+[debug] [2025-12-21T08:51:02.055Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:51:02.056Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:51:02.187495Z"}
+[debug] [2025-12-21T08:51:02.056Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:55:25.294Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:55:25.299Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:55:25.299Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:55:25.299Z] Platform:      darwin
+[debug] [2025-12-21T08:55:25.299Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:55:25.299Z] Time:          Sun Dec 21 2025 10:55:25 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:55:25.299Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:55:25.399Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:55:25.400Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:55:25.400Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:55:25.401Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:25.401Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:25.401Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:55:25.401Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:55:25.401Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:55:26.526Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:55:26.526Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:55:26.527Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:26.527Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:26.527Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:55:27.207Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:55:27.207Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:55:27.208Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:27.208Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:27.208Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:55:27.208Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:55:28.213Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:55:28.213Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:55:28.214Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:28.214Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:28.214Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:55:28.921Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:55:28.921Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-21T08:47:33.882518Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:51:02.187495Z"}]}
+[debug] [2025-12-21T08:55:28.931Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:28.931Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:28.931Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55 [none]
+[debug] [2025-12-21T08:55:29.667Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55 200
+[debug] [2025-12-21T08:55:29.667Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/c73ac8e7-fa9e-4252-a878-b92278138f55 [omitted]
+[info] i  storage: uploading rules storage.rules... 
+[debug] [2025-12-21T08:55:29.678Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:29.678Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:29.678Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [none]
+[debug] [2025-12-21T08:55:29.678Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets [omitted]
+[debug] [2025-12-21T08:55:30.516Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets 200
+[debug] [2025-12-21T08:55:30.517Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets {"name":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3","source":{"files":[{"content":"rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    \n    function isSignedIn() {\n      return request.auth != null;\n    }\n    \n    function isAdmin() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    function isBarber() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isBarber == true;\n    }\n\n    // Helper function to safely check admin status (with error handling)\n    function isAdminSafe() {\n      return request.auth != null &&\n             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&\n             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;\n    }\n\n    // Allow specific known admin UID (Eilon) - FALLBACK\n    function isKnownAdmin() {\n      return request.auth != null &&\n             request.auth.uid == '6XVviL49bMdNtCsQ1JuXRnD1qao1';\n    }\n    \n    function isValidImage() {\n      return request.resource.size < 5 * 1024 * 1024 // 5MB\n             && request.resource.contentType.matches('image/.*');\n    }\n    \n    // Profile images\n    match /profiles/{userId}/{allPaths=**} {\n      allow read: if true;\n      allow write: if isSignedIn() \n                      && request.auth.uid == userId \n                      && isValidImage();\n    }\n    \n    // Gallery images - allow authenticated users to upload (admin screen)\n    match /gallery/{allPaths=**} {\n      allow read: if true;\n      // Allow authenticated admins to upload (with fallback to known admin UID)\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      // Allow delete without image validation (can't validate deleted files)\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n    \n    // Barber/Worker images\n    match /barbers/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isBarber() || isAdmin() || isKnownAdmin());\n    }\n\n    match /workers/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isBarber() || isAdmin() || isKnownAdmin());\n    }\n\n    // Backgrounds\n    match /backgrounds/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // Splash screens\n    match /splash/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // About Us images\n    match /aboutus/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // App images (settings-managed images, gallery, etc.)\n    match /app-images/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // Shop images\n    match /shop/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // Treatment images\n    match /treatments/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdmin() || isKnownAdmin());\n    }\n\n    // Business assets\n    match /business/{allPaths=**} {\n      allow read: if true;\n      allow create, update: if (isAdminSafe() || isKnownAdmin()) && isValidImage();\n      allow delete: if (isAdminSafe() || isKnownAdmin());\n    }\n  }\n}","name":"storage.rules"}]},"createTime":"2025-12-21T08:55:30.654703Z","metadata":{"services":["firebase.storage"]}}
+[debug] [2025-12-21T08:55:30.517Z] [rules] created ruleset projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3
+[debug] [2025-12-21T08:55:30.518Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3
+[debug] [2025-12-21T08:55:30.518Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:30.518Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:55:30.518Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:55:30.518Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3"}}
+[debug] [2025-12-21T08:55:30.988Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:55:30.988Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:55:31.123992Z"}
+[debug] [2025-12-21T08:55:30.988Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview
+[debug] [2025-12-21T08:57:46.850Z] ----------------------------------------------------------------------
+[debug] [2025-12-21T08:57:46.852Z] Command:       /opt/homebrew/Cellar/node/24.4.1/bin/node /opt/homebrew/bin/firebase deploy --only storage
+[debug] [2025-12-21T08:57:46.852Z] CLI Version:   14.25.1
+[debug] [2025-12-21T08:57:46.852Z] Platform:      darwin
+[debug] [2025-12-21T08:57:46.852Z] Node Version:  v24.4.1
+[debug] [2025-12-21T08:57:46.852Z] Time:          Sun Dec 21 2025 10:57:46 GMT+0200 (Israel Standard Time)
+[debug] [2025-12-21T08:57:46.852Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-21T08:57:46.955Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-21T08:57:46.956Z] > authorizing via signed-in user (orel895@gmail.com)
+[debug] [2025-12-21T08:57:46.956Z] [iam] checking project eilon-matok for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-21T08:57:46.957Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:46.957Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:46.958Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions [none]
+[debug] [2025-12-21T08:57:46.958Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions x-goog-quota-user=projects/eilon-matok
+[debug] [2025-12-21T08:57:46.958Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-21T08:57:48.017Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions 200
+[debug] [2025-12-21T08:57:48.017Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/eilon-matok:testIamPermissions {"permissions":["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[info] 
+[info] === Deploying to 'eilon-matok'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2025-12-21T08:57:48.019Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:48.019Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:48.019Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket [none]
+[debug] [2025-12-21T08:57:48.692Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket 200
+[debug] [2025-12-21T08:57:48.692Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/eilon-matok/defaultBucket {"name":"projects/eilon-matok/defaultBucket","location":"EUROPE-WEST1","bucket":{"name":"projects/eilon-matok/buckets/eilon-matok.firebasestorage.app"},"storageClass":"REGIONAL"}
+[info] i  firebase.storage: checking storage.rules for compilation errors... 
+[debug] [2025-12-21T08:57:48.696Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:48.696Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:48.697Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [none]
+[debug] [2025-12-21T08:57:48.697Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test [omitted]
+[debug] [2025-12-21T08:57:49.590Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test 200
+[debug] [2025-12-21T08:57:49.590Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/eilon-matok:test {}
+[info] ✔  firebase.storage: rules file storage.rules compiled successfully 
+[debug] [2025-12-21T08:57:49.592Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:49.592Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:49.592Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases pageSize=10&pageToken=
+[debug] [2025-12-21T08:57:49.836Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases 200
+[debug] [2025-12-21T08:57:49.836Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases {"releases":[{"name":"projects/eilon-matok/releases/cloud.firestore","rulesetName":"projects/eilon-matok/rulesets/cd267ff5-ad75-4ae4-b776-e15ade188262","createTime":"2025-12-14T09:59:54.579186Z","updateTime":"2025-12-21T08:47:33.882518Z"},{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:55:31.123992Z"}]}
+[debug] [2025-12-21T08:57:49.851Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:49.851Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:49.851Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3 [none]
+[debug] [2025-12-21T08:57:50.090Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3 200
+[debug] [2025-12-21T08:57:50.090Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3 [omitted]
+[info] i  storage: latest version of storage.rules already up to date, skipping upload... 
+[debug] [2025-12-21T08:57:50.091Z] [rules] releasing firebase.storage/eilon-matok.firebasestorage.app with ruleset projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3
+[debug] [2025-12-21T08:57:50.092Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:50.092Z] Checked if tokens are valid: true, expires at: 1766309306490
+[debug] [2025-12-21T08:57:50.092Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app [none]
+[debug] [2025-12-21T08:57:50.092Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"release":{"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3"}}
+[debug] [2025-12-21T08:57:51.006Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app 200
+[debug] [2025-12-21T08:57:51.006Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app {"name":"projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app","rulesetName":"projects/eilon-matok/rulesets/dd2353d2-d477-4261-83c8-c82461e95fc3","createTime":"2025-12-14T11:11:09.556917Z","updateTime":"2025-12-21T08:57:51.132878Z"}
+[debug] [2025-12-21T08:57:51.006Z] [rules] updated release projects/eilon-matok/releases/firebase.storage/eilon-matok.firebasestorage.app
+[info] ✔  storage: released rules storage.rules to firebase.storage 
+[info] 
+[info] ✔  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/eilon-matok/overview

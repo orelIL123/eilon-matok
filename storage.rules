@@ -8,18 +8,27 @@ service firebase.storage {
     
     function isAdmin() {
       return request.auth != null &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
-    
+
     function isBarber() {
       return request.auth != null &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isBarber == true;
     }
-    
+
     // Helper function to safely check admin status (with error handling)
     function isAdminSafe() {
       return request.auth != null &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Allow specific known admin UID (Eilon) - FALLBACK
+    function isKnownAdmin() {
+      return request.auth != null &&
+             request.auth.uid == '6XVviL49bMdNtCsQ1JuXRnD1qao1';
     }
     
     function isValidImage() {
@@ -38,61 +47,72 @@ service firebase.storage {
     // Gallery images - allow authenticated users to upload (admin screen)
     match /gallery/{allPaths=**} {
       allow read: if true;
-      // Allow authenticated admins to upload
-      allow write: if isAdmin() && isValidImage();
+      // Allow authenticated admins to upload (with fallback to known admin UID)
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      // Allow delete without image validation (can't validate deleted files)
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
     
     // Barber/Worker images
     match /barbers/{allPaths=**} {
       allow read: if true;
-      allow write: if (isBarber() || isAdmin()) && isValidImage();
+      allow create, update: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isBarber() || isAdmin() || isKnownAdmin());
     }
-    
+
     match /workers/{allPaths=**} {
       allow read: if true;
-      allow write: if (isBarber() || isAdmin()) && isValidImage();
+      allow create, update: if (isBarber() || isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isBarber() || isAdmin() || isKnownAdmin());
     }
-    
+
     // Backgrounds
     match /backgrounds/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
-    
+
     // Splash screens
     match /splash/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
-    
+
     // About Us images
     match /aboutus/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
 
     // App images (settings-managed images, gallery, etc.)
     match /app-images/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
-    
+
     // Shop images
     match /shop/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
-    
+
     // Treatment images
     match /treatments/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isValidImage();
+      allow create, update: if (isAdmin() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdmin() || isKnownAdmin());
     }
-    
+
     // Business assets
     match /business/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdminSafe() && isValidImage();
+      allow create, update: if (isAdminSafe() || isKnownAdmin()) && isValidImage();
+      allow delete: if (isAdminSafe() || isKnownAdmin());
     }
   }
 }

@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:525402752082:android:b6fdabec9ade6f8b2c8b8b",
+        "mobilesdk_app_id": "1:525402752082:android:7c588220698b20552c8b8b",
         "android_client_info": {
-          "package_name": "com.eilonnmaok.app"
+          "package_name": "com.eilonmatok.app"
         }
       },
       "oauth_client": [],

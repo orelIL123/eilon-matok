@@ -1,35 +1,35 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import {
-  createUserWithEmailAndPassword,
-  EmailAuthProvider,
-  linkWithCredential,
-  onAuthStateChanged,
-  PhoneAuthProvider,
-  sendPasswordResetEmail,
-  signInWithCredential,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  User
+    createUserWithEmailAndPassword,
+    EmailAuthProvider,
+    linkWithCredential,
+    onAuthStateChanged,
+    PhoneAuthProvider,
+    sendPasswordResetEmail,
+    signInWithCredential,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile,
+    User
 } from 'firebase/auth';
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-  updateDoc,
-  where,
-  writeBatch
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    limit,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    setDoc,
+    Timestamp,
+    updateDoc,
+    where,
+    writeBatch
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes, UploadMetadata } from 'firebase/storage';
@@ -2245,7 +2245,29 @@ export const addGalleryImage = async (imageData: Omit<GalleryImage, 'id' | 'crea
 
 export const deleteGalleryImage = async (imageId: string) => {
   try {
-    await deleteDoc(doc(db, 'gallery', imageId));
+    // Get the image document to retrieve the imageUrl
+    const imageDoc = await getDoc(doc(db, 'gallery', imageId));
+
+    if (imageDoc.exists()) {
+      const imageData = imageDoc.data();
+      const imageUrl = imageData.imageUrl;
+
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'gallery', imageId));
+
+      // Delete from Firebase Storage if it's a Firebase Storage URL
+      if (imageUrl && imageUrl.includes('firebasestorage.googleapis.com')) {
+        try {
+          console.log('🗑️ Deleting image from Firebase Storage:', imageUrl);
+          const imageRef = ref(storage, imageUrl);
+          await deleteObject(imageRef);
+          console.log('✅ Image deleted from Firebase Storage');
+        } catch (storageError: any) {
+          console.warn('⚠️ Failed to delete from Storage (may not exist):', storageError.message);
+          // Continue even if storage deletion fails (image might not exist in storage)
+        }
+      }
+    }
   } catch (error) {
     throw error;
   }
@@ -2426,32 +2448,77 @@ export const uploadImageToStorage = async (
     console.log('📤 Starting image upload:', imageUri);
     console.log('📁 Target folder:', folderPath);
     console.log('📝 File name:', fileName);
-    console.log('👤 Current user:', user.uid, user.email);
+    console.log('👤 Current user UID:', user.uid);
+    console.log('👤 Current user email:', user.email);
+    console.log('👤 Current user phone:', user.phoneNumber || 'N/A');
     
-    // Check if user is admin in Firestore (for debugging)
+    // Verify admin status before upload - CRITICAL CHECK
+    let userProfile;
     try {
-      const userProfile = await getUserProfile(user.uid);
-      console.log('👨‍💼 User profile:', {
+      userProfile = await getUserProfile(user.uid);
+      console.log('👨‍💼 User profile from Firestore:', {
         isAdmin: userProfile?.isAdmin || false,
-        displayName: userProfile?.displayName || 'N/A'
+        isBarber: userProfile?.isBarber || false,
+        displayName: userProfile?.displayName || 'N/A',
+        email: userProfile?.email || 'N/A',
+        phone: userProfile?.phone || 'N/A',
+        uid: user.uid
       });
+      
+      if (!userProfile) {
+        console.error('❌ User profile is NULL!');
+        throw new Error('פרופיל משתמש לא נמצא במערכת');
+      }
+      
+      if (!userProfile.isAdmin) {
+        console.error('❌ User is NOT admin in Firestore!');
+        console.error('   Expected UID: 6XVviL49bMdNtCsQ1JuXRnD1qao1 (Eilon)');
+        console.error('   Actual UID:', user.uid);
+        console.error('   Email:', user.email);
+        console.error('   isAdmin value:', userProfile.isAdmin);
+        throw new Error('אין הרשאות מנהל. אנא וודא שאתה מחובר כמנהל עם המספר 0508315002');
+      }
+      console.log('✅ Admin status verified in Firestore - user IS admin');
     } catch (profileError) {
-      console.warn('⚠️ Could not check user profile:', profileError);
+      console.error('❌ Could not verify admin status:', profileError);
+      if (profileError instanceof Error && (profileError.message.includes('אין הרשאות') || profileError.message.includes('לא נמצא'))) {
+        throw profileError;
+      }
+      throw new Error('שגיאה בבדיקת הרשאות מנהל: ' + (profileError instanceof Error ? profileError.message : 'Unknown error'));
     }
     
-    // Get fresh token to ensure authentication
+    // Get fresh token to ensure authentication (this helps storage rules read Firestore)
     try {
-      const token = await user.getIdToken(true); // Force refresh
-      console.log('🔑 User token refreshed:', !!token);
-      console.log('🔑 Token length:', token.length);
+      const token = await user.getIdToken(true); // Force refresh to get latest claims
+      console.log('🔑 User token refreshed successfully');
+      console.log('🔑 Token exists:', !!token);
+      
+      // Decode token to check claims (for debugging)
+      try {
+        const decodedToken = await user.getIdTokenResult();
+        console.log('🔑 Token claims:', {
+          admin: decodedToken.claims.admin || false,
+          barber: decodedToken.claims.barber || false,
+          email: decodedToken.claims.email || 'N/A'
+        });
+      } catch (decodeError) {
+        console.warn('⚠️ Could not decode token claims:', decodeError);
+      }
     } catch (tokenError) {
       console.error('❌ Error getting token:', tokenError);
-      throw new Error('Failed to get authentication token');
+      throw new Error('שגיאה באימות המשתמש');
     }
+    
+    // Double-check: Log the exact UID we're using
+    console.log('🔍 Final verification before upload:');
+    console.log('   User UID:', user.uid);
+    console.log('   Expected UID for Eilon: 6XVviL49bMdNtCsQ1JuXRnD1qao1');
+    console.log('   UIDs match:', user.uid === '6XVviL49bMdNtCsQ1JuXRnD1qao1');
+    console.log('   User isAdmin (from profile):', userProfile?.isAdmin);
     
     // Create reference
     const imageRef = ref(storage, `${folderPath}/${fileName}`);
-    console.log('📍 Storage reference created');
+    console.log('📍 Storage reference created:', imageRef.fullPath);
     
     // For React Native, we need to convert the URI to a blob using XMLHttpRequest
     // This is more stable than fetch() in React Native
@@ -2507,13 +2574,21 @@ export const uploadImageToStorage = async (
     console.log('✅ Image uploaded successfully:', downloadURL);
     
     return downloadURL;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error uploading image:', error);
     console.error('❌ Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      message: error?.message || 'Unknown error',
+      code: error?.code,
+      stack: error?.stack
     });
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for permission errors
+    if (error?.code === 'storage/unauthorized' || error?.code === 'permission-denied') {
+      console.error('🔒 PERMISSION DENIED - User may not be admin or document may not exist in Firestore');
+      throw new Error('אין הרשאה להעלות תמונות. אנא וודא שאתה מחובר כמנהל.');
+    }
+    
+    const errorMessage = error?.message || 'Unknown error';
     throw new Error(`Failed to upload image: ${errorMessage}`);
   }
 };

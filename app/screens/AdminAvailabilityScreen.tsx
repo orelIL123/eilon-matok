@@ -103,8 +103,9 @@ const isTimeSlotPassed = (date: string, time: string): boolean => {
 const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNavigate, onBack }) => {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed to false - screen opens immediately
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false); // Loading state for modal
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [availability, setAvailability] = useState<{
@@ -118,7 +119,6 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
   }[]>(generateNext14Days());
   const [bookedSlots, setBookedSlots] = useState<{[key: string]: string[]}>({});
   const [rangeStartSlot, setRangeStartSlot] = useState<{date: string, time: string} | null>(null);
-  const [multiSelectMode, setMultiSelectMode] = useState(false);
 
   const db = getFirestore();
 
@@ -186,7 +186,10 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
 
   const loadBarbers = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading on initial load if barbers list is empty
+      if (barbers.length === 0) {
+        setLoading(true);
+      }
       const barbersData = await getBarbers();
       setBarbers(barbersData);
     } catch (error) {
@@ -195,7 +198,7 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [barbers.length]);
 
   useEffect(() => {
     loadBarbers();
@@ -450,15 +453,22 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
 
   const openEditModal = async (barber: Barber) => {
     setSelectedBarber(barber);
-    await Promise.all([
-      loadBarberAvailability(barber.id),
-      loadBookedSlots(barber.id)
-    ]);
-    
-    // No conversion. Admin controls exact dates only. Just load current state.
-    await loadBarberAvailability(barber.id);
-    
+    // Open modal immediately for better UX
     setModalVisible(true);
+    setModalLoading(true);
+    
+    try {
+      // Load data in background
+      await Promise.all([
+        loadBarberAvailability(barber.id),
+        loadBookedSlots(barber.id)
+      ]);
+    } catch (error) {
+      console.error('Error loading availability data:', error);
+      showToast('שגיאה בטעינת זמינות', 'error');
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   // Real-time listener REMOVED to prevent state conflicts
@@ -894,6 +904,12 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
               </TouchableOpacity>
             </View>
 
+            {modalLoading ? (
+              <View style={styles.modalLoadingContainer}>
+                <ScissorsLoader size={60} />
+                <Text style={styles.modalLoadingText}>טוען זמינות...</Text>
+              </View>
+            ) : (
             <ScrollView style={styles.modalBody}>
               <Text style={styles.instructionText}>
                 שליטה מלאה על זמינות {selectedBarber?.name}
@@ -901,6 +917,26 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
               <Text style={styles.subInstructionText}>
                 כל סלוט הוא 5 דקות. ברירת מחדל: ימי שישי ושבת לא זמינים, שעות 09:00-17:00 כשמפעילים יום.
               </Text>
+              <Text style={styles.rangeInstructionText}>
+                💡 לחץ ארוך על סלוט התחלה ואז לחץ על סלוט סיום - כדי לבחור טווח שלם!
+              </Text>
+
+              {rangeStartSlot && (
+                <View style={styles.rangeSelectionHint}>
+                  <Text style={styles.rangeSelectionText}>
+                    🎯 נקודת התחלה: {rangeStartSlot.time} - לחץ על סלוט אחר לבחירת טווח
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.cancelRangeButton}
+                    onPress={() => {
+                      setRangeStartSlot(null);
+                      showToast('בחירת טווח בוטלה', 'success');
+                    }}
+                  >
+                    <Text style={styles.cancelRangeButtonText}>✕ בטל</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <Text style={styles.debugText}>
                 נמצאו {availability.length} ימים
@@ -933,33 +969,16 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
 
                   {day.isAvailable && (
                     <View style={styles.timeGrid}>
-                      <View style={styles.timeGridHeader}>
-                        <Text style={styles.timeGridTitle}>בחר שעות זמינות:</Text>
-                        <TouchableOpacity
-                          style={[
-                            styles.multiSelectButton,
-                            multiSelectMode && styles.multiSelectButtonActive
-                          ]}
-                          onPress={() => setMultiSelectMode(!multiSelectMode)}
-                        >
-                          <Text style={[
-                            styles.multiSelectButtonText,
-                            multiSelectMode && styles.multiSelectButtonTextActive
-                          ]}>
-                            {multiSelectMode ? '✓ בחירה מרובה' : 'בחירה מרובה'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                      {multiSelectMode && (
-                        <Text style={styles.multiSelectHint}>
-                          💡 במצב בחירה מרובה - כל לחיצה בוחרת/מסירה סלוט
-                        </Text>
-                      )}
+                      <Text style={styles.timeGridTitle}>בחר שעות זמינות:</Text>
+                      <Text style={styles.rangeHintInCard}>
+                        לחיצה ארוכה = התחל בחירת טווח | לחיצה רגילה = בחר/בטל בודד
+                      </Text>
                       <View style={styles.timeSlots}>
                         {getTimeSlots().map((time) => {
                           const isSelected = (day.timeSlots || []).includes(time);
                           const hasPassed = isTimeSlotPassed(day.date, time);
                           const isBooked = (bookedSlots[day.date] || []).includes(time);
+                          const isRangeStart = rangeStartSlot?.date === day.date && rangeStartSlot?.time === time;
 
                           return (
                             <TouchableOpacity
@@ -970,6 +989,8 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                                   ? styles.passedTimeSlot
                                   : isBooked
                                   ? styles.bookedTimeSlot
+                                  : isRangeStart
+                                  ? styles.rangeStartSlot
                                   : isSelected
                                   ? styles.selectedTimeSlot
                                   : styles.unselectedTimeSlot
@@ -978,10 +999,11 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                                 if (!hasPassed && !isBooked) {
                                   // If range start is set and it's the same day, select the range
                                   if (rangeStartSlot && rangeStartSlot.date === day.date && rangeStartSlot.time !== time) {
-                                    // Select range from start to current
-                                    const shouldSelect = !isSelected; // If start slot was not selected, select the range
-                                    toggleSlotsRange(day.date, rangeStartSlot.time, time, !shouldSelect);
+                                    // Determine if we should select or deselect based on the START slot state
+                                    const startSlotIsSelected = (day.timeSlots || []).includes(rangeStartSlot.time);
+                                    toggleSlotsRange(day.date, rangeStartSlot.time, time, startSlotIsSelected);
                                     setRangeStartSlot(null); // Clear range selection
+                                    showToast(startSlotIsSelected ? 'טווח נבחר בהצלחה' : 'טווח בוטל בהצלחה', 'success');
                                   } else {
                                     // Normal single slot toggle
                                     toggleTimeSlot(day.date, time);
@@ -992,9 +1014,10 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                                 // Set range start slot
                                 if (!hasPassed && !isBooked) {
                                   setRangeStartSlot({ date: day.date, time });
+                                  showToast(`נקודת התחלה: ${time}`, 'success');
                                 }
                               }}
-                              delayLongPress={300}
+                              delayLongPress={500}
                               disabled={hasPassed || isBooked}
                             >
                               <Text
@@ -1004,10 +1027,12 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                                     ? styles.passedTimeSlotText
                                     : isBooked
                                     ? styles.bookedTimeSlotText
+                                    : isRangeStart
+                                    ? styles.rangeStartSlotText
                                     : isSelected && styles.selectedTimeSlotText
                                 ]}
                               >
-                                {isBooked ? `${time} 📅` : time}
+                                {isBooked ? `${time} 📅` : isRangeStart ? `${time} 🎯` : time}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -1021,6 +1046,7 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                 </View>
               ))}
             </ScrollView>
+            )}
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -1092,6 +1118,8 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#222', flex: 1, textAlign: 'right' },
   modalBody: { flex: 1, marginBottom: 20 },
+  modalLoadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
+  modalLoadingText: { fontSize: 16, color: '#666', marginTop: 16, textAlign: 'center' },
   timeSlot: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, marginBottom: 8,
     minWidth: 70, alignItems: 'center',
@@ -1162,6 +1190,70 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   weekendButton: { borderWidth: 2, borderColor: '#ff9800' },
+
+  // Range selection styles
+  rangeInstructionText: {
+    fontSize: 14,
+    color: '#ff6f00',
+    textAlign: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff3e0',
+    padding: 12,
+    borderRadius: 8,
+    lineHeight: 20,
+    fontWeight: '600',
+    borderWidth: 2,
+    borderColor: '#ff9800'
+  },
+  rangeHintInCard: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontStyle: 'italic',
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 6
+  },
+  rangeStartSlot: {
+    backgroundColor: '#ff9800',
+    borderColor: '#ff9800',
+    borderWidth: 2
+  },
+  rangeStartSlotText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  rangeSelectionHint: {
+    backgroundColor: '#fff3e0',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  rangeSelectionText: {
+    fontSize: 13,
+    color: '#ff6f00',
+    fontWeight: '600',
+    flex: 1
+  },
+  cancelRangeButton: {
+    backgroundColor: '#ff6f00',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 8
+  },
+  cancelRangeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold'
+  },
 });
 
 export default AdminAvailabilityScreen;

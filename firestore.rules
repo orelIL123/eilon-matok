@@ -25,8 +25,9 @@ service cloud.firestore {
     match /users/{userId} {
       // Allow read for signed-in users OR for password reset check (queries only, not direct document access)
       // This allows checking if a user exists by phone/email for password reset flow
+      // Also allow reads by Storage rules (they use firestore.get() internally)
       // Direct document access requires sign-in, but queries (for password reset) are allowed
-      allow get: if isSignedIn(); // Direct document access requires sign-in
+      allow get: if true; // Allow reads - needed for Storage rules to check admin status
       allow list: if true; // Allow queries for password reset check
       allow create: if isSignedIn();
       allow update: if isOwner(userId) || isAdmin();
