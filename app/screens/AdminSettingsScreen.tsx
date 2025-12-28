@@ -28,8 +28,7 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
   // Settings states
   const [welcomeMessage, setWelcomeMessage] = useState('שלום, ברוכים הבאים ל-eilon matok לאילון מתוק');
   const [subtitleMessage, setSubtitleMessage] = useState('לאילון מתוק ברברשופ');
-  const [aboutUsText, setAboutUsText] = useState('ברוכים הבאים למספרת אילון מתוק! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. אילון, ספר מקצועי עם שנות ניסיון, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
-  const [popupMessage, setPopupMessage] = useState('');
+  const [aboutUsText, setAboutUsText] = useState('ברוכים הבאים למספרת אילון מתוק!\n\nאנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי.\n\nהצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.\n\nבואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.');
 
   useEffect(() => {
     loadSettings();
@@ -107,7 +106,7 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         setAboutUsText(data.text || '');
       } else {
         // Create default if doesn't exist
-        const defaultAboutText = 'ברוכים הבאים למספרת אילון מתוק! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. אילון, ספר מקצועי עם שנות ניסיון, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.';
+        const defaultAboutText = 'ברוכים הבאים למספרת אילון מתוק!\n\nאנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי.\n\nהצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.\n\nבואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.';
         await setDoc(
           doc(db, 'settings', 'aboutUsText'),
           {
@@ -168,46 +167,6 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
     }
   };
 
-  const sendPopupMessage = async () => {
-    if (!popupMessage.trim()) {
-      Alert.alert('שגיאה', 'נא להזין הודעה');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await setDoc(doc(db, 'settings', 'popupMessage'), {
-        message: popupMessage,
-        isActive: true,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-      });
-      setPopupMessage('');
-      showToast('ההודעה נשלחה לכל המשתמשים!');
-    } catch (error) {
-      console.error('Error sending popup message:', error);
-      showToast('שגיאה בשליחת ההודעה', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const clearPopupMessage = async () => {
-    try {
-      setLoading(true);
-      await setDoc(doc(db, 'settings', 'popupMessage'), {
-        message: '',
-        isActive: false,
-        clearedAt: new Date()
-      });
-      showToast('ההודעה הוסרה מכל המשתמשים');
-    } catch (error) {
-      console.error('Error clearing popup message:', error);
-      showToast('שגיאה בהסרת ההודעה', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -283,47 +242,6 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
             <Text style={styles.saveButtonText}>שמור טקסט אודותינו</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Popup Message Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>שליחת הודעה לכל המשתמשים</Text>
-          <Text style={styles.sectionDescription}>
-            ההודעה תופיע כחלונית קופצת לכל המשתמשים במשך 24 שעות
-          </Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>תוכן ההודעה</Text>
-            <TextInput
-              style={[styles.textInput, styles.multilineInput]}
-              value={popupMessage}
-              onChangeText={setPopupMessage}
-              placeholder="הזן הודעה למשתמשים..."
-              textAlign="right"
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={styles.sendButton} 
-              onPress={sendPopupMessage}
-              disabled={loading}
-            >
-              <Ionicons name="send" size={20} color="#fff" />
-              <Text style={styles.buttonText}>שלח הודעה</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.clearButton} 
-              onPress={clearPopupMessage}
-              disabled={loading}
-            >
-              <Ionicons name="close-circle" size={20} color="#fff" />
-              <Text style={styles.buttonText}>הסר הודעה</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Notification Settings Section */}

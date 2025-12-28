@@ -312,6 +312,14 @@ export async function scheduleAppointmentReminders(appointment: AppointmentRemin
     const appointmentTime = new Date(appointment.startsAt);
     const now = new Date();
 
+    // Log detailed timing information for debugging
+    console.log('📅 Appointment time (ISO):', appointment.startsAt);
+    console.log('📅 Appointment time (parsed):', appointmentTime.toISOString());
+    console.log('📅 Appointment time (local):', appointmentTime.toLocaleString('he-IL'));
+    console.log('📅 Current time (local):', now.toLocaleString('he-IL'));
+    console.log('📅 Time difference (ms):', appointmentTime.getTime() - now.getTime());
+    console.log('📅 Time difference (hours):', (appointmentTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+
     // Validate appointment is in the future
     if (appointmentTime.getTime() <= now.getTime()) {
       console.log('⚠️ Appointment is in the past, not scheduling reminders');

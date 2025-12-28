@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -32,6 +34,7 @@ interface NotificationSettings {
   newAppointmentBooked: boolean;
   appointmentCancelled: boolean;
   appointmentReminders: boolean;
+  cancellationDeadlineHours: number;
   reminderTimings: {
     oneHourBefore: boolean;
     thirtyMinutesBefore: boolean;
@@ -51,6 +54,7 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
     newAppointmentBooked: true,
     appointmentCancelled: true,
     appointmentReminders: true,
+    cancellationDeadlineHours: 2,
     reminderTimings: {
       oneHourBefore: true,
       thirtyMinutesBefore: true,
@@ -66,9 +70,14 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
   const [sendSMS, setSendSMS] = useState(false);
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
+  // State for broadcast history
+  const [broadcastHistory, setBroadcastHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   useEffect(() => {
     checkAdminStatus();
     loadSettings();
+    loadBroadcastHistory();
   }, []);
 
   const checkAdminStatus = async () => {
@@ -107,6 +116,7 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
         newAppointmentBooked: true,
         appointmentCancelled: true,
         appointmentReminders: true,
+        cancellationDeadlineHours: 2,
         reminderTimings: {
           oneHourBefore: true,
           thirtyMinutesBefore: true,
@@ -170,20 +180,20 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
       const newReminderTimings = { ...settings.reminderTimings, [timing]: !settings.reminderTimings[timing] };
       const newSettings = { ...settings, reminderTimings: newReminderTimings };
       setSettings(newSettings);
-      
+
       console.log(`🔧 Updating reminder timing: ${timing} = ${newReminderTimings[timing]}`);
-      
+
       // Save to Firestore with proper error handling
       const db = getFirestore();
-      
+
       await setDoc(doc(db, 'adminSettings', 'notifications'), {
         ...newSettings,
         updatedAt: new Date(),
         lastUpdatedBy: getCurrentUser()?.uid || 'unknown'
       }, { merge: true }); // Use merge to avoid overwriting other fields
-      
+
       console.log('✅ Reminder timing settings updated and saved:', newReminderTimings);
-      
+
       // Verify the settings were saved by reloading them
       setTimeout(async () => {
         try {
@@ -194,7 +204,7 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
           console.error('❌ Error verifying saved reminder settings:', e);
         }
       }, 1000);
-      
+
       // Show success message
       Alert.alert(
         'הגדרות תזכורות עודכנו',
@@ -204,10 +214,86 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
     } catch (error) {
       console.error('❌ Error updating reminder settings:', error);
       Alert.alert(
-        'שגיאה', 
+        'שגיאה',
         `לא ניתן לעדכן את הגדרות התזכורות: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`
       );
     }
+  };
+
+  const handleCancellationDeadlineChange = async (hours: number) => {
+    try {
+      const newSettings = { ...settings, cancellationDeadlineHours: hours };
+      setSettings(newSettings);
+
+      console.log(`🔧 Updating cancellation deadline: ${hours} hours`);
+
+      // Save to Firestore
+      const db = getFirestore();
+
+      await setDoc(doc(db, 'adminSettings', 'notifications'), {
+        ...newSettings,
+        updatedAt: new Date(),
+        lastUpdatedBy: getCurrentUser()?.uid || 'unknown'
+      }, { merge: true });
+
+      console.log('✅ Cancellation deadline updated and saved:', hours);
+
+      // Show success message
+      Alert.alert(
+        'הגדרות עודכנו',
+        `זמן מינימום לביטול תור עודכן ל-${hours} שעות לפני`,
+        [{ text: 'אישור' }]
+      );
+    } catch (error) {
+      console.error('❌ Error updating cancellation deadline:', error);
+      Alert.alert(
+        'שגיאה',
+        `לא ניתן לעדכן את ההגדרות: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`
+      );
+    }
+  };
+
+  const loadBroadcastHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const { getBroadcastMessages } = await import('../../services/firebase');
+      const messages = await getBroadcastMessages();
+      setBroadcastHistory(messages);
+      console.log('✅ Loaded broadcast history:', messages.length);
+    } catch (error) {
+      console.error('❌ Error loading broadcast history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleDeleteBroadcast = async (messageId: string) => {
+    Alert.alert(
+      'מחיקת הודעה',
+      'האם אתה בטוח שברצונך למחוק הודעה זו?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { deleteBroadcastMessage } = await import('../../services/firebase');
+              const success = await deleteBroadcastMessage(messageId);
+              if (success) {
+                Alert.alert('הצלחה', 'ההודעה נמחקה בהצלחה');
+                loadBroadcastHistory(); // Reload history
+              } else {
+                Alert.alert('שגיאה', 'לא ניתן למחוק את ההודעה');
+              }
+            } catch (error) {
+              console.error('Error deleting broadcast:', error);
+              Alert.alert('שגיאה', 'לא ניתן למחוק את ההודעה');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleBack = () => {
@@ -226,10 +312,10 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
 
     try {
       setSendingBroadcast(true);
-      
-      // Send push notification
-      const sentCount = await sendNotificationToAllUsers(broadcastTitle, broadcastMessage);
-      
+
+      // Send push notification with SMS flag
+      const sentCount = await sendNotificationToAllUsers(broadcastTitle, broadcastMessage, undefined, sendSMS);
+
       let message = `הודעה נשלחה ל-${sentCount} משתמשים`;
       
       // If SMS is enabled, send SMS as well
@@ -279,7 +365,10 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
       }
       
       Alert.alert('הצלחה', message);
-      
+
+      // Reload broadcast history
+      loadBroadcastHistory();
+
       // Reset form
       setBroadcastTitle('');
       setBroadcastMessage('');
@@ -487,6 +576,71 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
           </View>
         )}
 
+        {/* Cancellation Policy Section */}
+        <View style={styles.cancellationSection}>
+          <View style={styles.cancellationHeader}>
+            <Ionicons name="ban" size={24} color="#dc3545" />
+            <Text style={styles.cancellationTitle}>מדיניות ביטול תורים</Text>
+          </View>
+          <Text style={styles.cancellationDescription}>
+            קבע כמה זמן לפני התור לקוחות לא יוכלו לבטל
+          </Text>
+
+          <View style={styles.deadlineOptions}>
+            <TouchableOpacity
+              style={[
+                styles.deadlineOption,
+                settings.cancellationDeadlineHours === 1 && styles.deadlineOptionSelected
+              ]}
+              onPress={() => handleCancellationDeadlineChange(1)}
+            >
+              <Text style={[
+                styles.deadlineOptionText,
+                settings.cancellationDeadlineHours === 1 && styles.deadlineOptionTextSelected
+              ]}>
+                שעה לפני
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.deadlineOption,
+                settings.cancellationDeadlineHours === 2 && styles.deadlineOptionSelected
+              ]}
+              onPress={() => handleCancellationDeadlineChange(2)}
+            >
+              <Text style={[
+                styles.deadlineOptionText,
+                settings.cancellationDeadlineHours === 2 && styles.deadlineOptionTextSelected
+              ]}>
+                שעתיים לפני
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.deadlineOption,
+                settings.cancellationDeadlineHours === 4 && styles.deadlineOptionSelected
+              ]}
+              onPress={() => handleCancellationDeadlineChange(4)}
+            >
+              <Text style={[
+                styles.deadlineOptionText,
+                settings.cancellationDeadlineHours === 4 && styles.deadlineOptionTextSelected
+              ]}>
+                4 שעות לפני
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.deadlineInfo}>
+            <Ionicons name="information-circle-outline" size={16} color="#666" />
+            <Text style={styles.deadlineInfoText}>
+              לקוחות לא יוכלו לבטל תור פחות מ-{settings.cancellationDeadlineHours} שעות לפני מועד התור
+            </Text>
+          </View>
+        </View>
+
         {/* Broadcast Message Section */}
         <View style={styles.broadcastSection}>
           <View style={styles.broadcastHeader}>
@@ -503,6 +657,66 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
             <Ionicons name="send" size={20} color="#fff" />
             <Text style={styles.broadcastButtonText}>שלח הודעה</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Broadcast History Section */}
+        <View style={styles.historySection}>
+          <View style={styles.historyHeader}>
+            <Ionicons name="time" size={24} color="#6c757d" />
+            <Text style={styles.historyTitle}>הודעות שנשלחו</Text>
+          </View>
+          <Text style={styles.historyDescription}>
+            היסטוריית הודעות שנשלחו לכל המשתמשים
+          </Text>
+
+          {loadingHistory ? (
+            <View style={styles.historyLoading}>
+              <Text style={styles.historyLoadingText}>טוען...</Text>
+            </View>
+          ) : broadcastHistory.length === 0 ? (
+            <View style={styles.historyEmpty}>
+              <Ionicons name="mail-open-outline" size={48} color="#ccc" />
+              <Text style={styles.historyEmptyText}>לא נשלחו הודעות עדיין</Text>
+            </View>
+          ) : (
+            <View style={styles.historyList}>
+              {broadcastHistory.map((message) => (
+                <View key={message.id} style={styles.historyItem}>
+                  <View style={styles.historyItemHeader}>
+                    <Text style={styles.historyItemTitle}>{message.title}</Text>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteBroadcast(message.id)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#dc3545" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.historyItemBody} numberOfLines={2}>
+                    {message.body}
+                  </Text>
+                  <View style={styles.historyItemFooter}>
+                    <View style={styles.historyItemInfo}>
+                      <Ionicons name="person-outline" size={14} color="#666" />
+                      <Text style={styles.historyItemInfoText}>{message.sentByName}</Text>
+                    </View>
+                    <View style={styles.historyItemInfo}>
+                      <Ionicons name="people-outline" size={14} color="#666" />
+                      <Text style={styles.historyItemInfoText}>{message.recipientCount} נמענים</Text>
+                    </View>
+                    {message.includesSMS && (
+                      <View style={styles.historyItemInfo}>
+                        <Ionicons name="chatbubble-outline" size={14} color="#666" />
+                        <Text style={styles.historyItemInfoText}>SMS</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.historyItemDate}>
+                    {message.sentAt?.toDate?.()?.toLocaleString('he-IL') || 'תאריך לא ידוע'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Info Section */}
@@ -527,8 +741,16 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
         animationType="slide"
         onRequestClose={() => setShowBroadcastModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>שליחת הודעה לכל המשתמשים</Text>
               <TouchableOpacity onPress={() => setShowBroadcastModal(false)}>
@@ -590,7 +812,8 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -923,6 +1146,183 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginLeft: 12,
+    fontFamily: 'Heebo-Regular',
+  },
+  // Cancellation policy styles
+  cancellationSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cancellationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cancellationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+    fontFamily: 'Heebo-Medium',
+  },
+  cancellationDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    fontFamily: 'Heebo-Regular',
+  },
+  deadlineOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  deadlineOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  deadlineOptionSelected: {
+    borderColor: '#dc3545',
+    backgroundColor: '#dc3545',
+  },
+  deadlineOptionText: {
+    fontSize: 14,
+    color: '#333',
+    fontFamily: 'Heebo-Medium',
+    textAlign: 'center',
+  },
+  deadlineOptionTextSelected: {
+    color: '#fff',
+  },
+  deadlineInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deadlineInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+    fontFamily: 'Heebo-Regular',
+    lineHeight: 18,
+  },
+  // Broadcast history styles
+  historySection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+    fontFamily: 'Heebo-Medium',
+  },
+  historyDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    fontFamily: 'Heebo-Regular',
+  },
+  historyLoading: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  historyLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Heebo-Regular',
+  },
+  historyEmpty: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  historyEmptyText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 12,
+    fontFamily: 'Heebo-Regular',
+  },
+  historyList: {
+    gap: 12,
+  },
+  historyItem: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007bff',
+  },
+  historyItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyItemTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    fontFamily: 'Heebo-Medium',
+  },
+  deleteButton: {
+    padding: 4,
+  },
+  historyItemBody: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    fontFamily: 'Heebo-Regular',
+    lineHeight: 20,
+  },
+  historyItemFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 8,
+  },
+  historyItemInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  historyItemInfoText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'Heebo-Regular',
+  },
+  historyItemDate: {
+    fontSize: 12,
+    color: '#999',
     fontFamily: 'Heebo-Regular',
   },
 });

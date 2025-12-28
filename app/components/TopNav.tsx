@@ -22,6 +22,7 @@ interface TopNavProps {
   showCloseButton?: boolean;
   onClosePress?: () => void;
   customBellIcon?: React.ReactNode;
+  badgeCount?: number;
 }
 
 const TopNav: React.FC<TopNavProps> = ({ 
@@ -32,7 +33,8 @@ const TopNav: React.FC<TopNavProps> = ({
   onBackPress, 
   showCloseButton = false, 
   onClosePress,
-  customBellIcon
+  customBellIcon,
+  badgeCount = 0
 }) => {
   const [fontsLoaded] = useFonts({
     PlayfairDisplay_700Bold,
@@ -140,7 +142,14 @@ const TopNav: React.FC<TopNavProps> = ({
               ) : customBellIcon ? (
                 customBellIcon
               ) : (
-                <Ionicons name="notifications-outline" size={24} color="#000" />
+                <View style={styles.bellContainer}>
+                  <Ionicons name="notifications-outline" size={24} color="#000" />
+                  {badgeCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+                    </View>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
           </LinearGradient>
@@ -251,6 +260,28 @@ const styles = StyleSheet.create({
   },
   underlineGradient: {
     flex: 1,
+  },
+  bellContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

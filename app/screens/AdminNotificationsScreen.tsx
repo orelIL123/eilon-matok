@@ -19,7 +19,10 @@ import {
 import {
     checkIsAdmin,
     getAllUsers,
-    onAuthStateChange
+    onAuthStateChange,
+    getBroadcastMessages,
+    deleteBroadcastMessage,
+    BroadcastMessage
 } from '../../services/firebase';
 import ScissorsLoader from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
@@ -48,6 +51,8 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [broadcastMessages, setBroadcastMessages] = useState<BroadcastMessage[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
@@ -69,6 +74,7 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
   useEffect(() => {
     if (isAdmin) {
       loadUsers();
+      loadBroadcastMessages();
     }
   }, [isAdmin]);
 
@@ -82,6 +88,47 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadBroadcastMessages = async () => {
+    try {
+      setLoadingMessages(true);
+      const messages = await getBroadcastMessages();
+      setBroadcastMessages(messages);
+      console.log('✅ Loaded broadcast messages:', messages.length);
+    } catch (error) {
+      console.error('❌ Error loading broadcast messages:', error);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    Alert.alert(
+      'מחיקת הודעה',
+      'האם אתה בטוח שברצונך למחוק הודעה זו? פעולה זו לא תחזור.',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await deleteBroadcastMessage(messageId);
+              if (success) {
+                Alert.alert('הצלחה', 'ההודעה נמחקה בהצלחה');
+                loadBroadcastMessages(); // Reload messages
+              } else {
+                Alert.alert('שגיאה', 'לא ניתן למחוק את ההודעה');
+              }
+            } catch (error) {
+              console.error('Error deleting message:', error);
+              Alert.alert('שגיאה', 'אירעה שגיאה בעת מחיקת ההודעה');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const sendNotification = async () => {
@@ -105,6 +152,8 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
       }
       
       if (success) {
+        // Reload broadcast messages after sending
+        loadBroadcastMessages();
         Alert.alert(
           'התראה נשלחה',
           'ההודעה "' + notificationTitle + '" נשלחה בהצלחה!',
@@ -213,6 +262,61 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
                     <Text style={styles.statLabel}>ללא התראות</Text>
                   </View>
                 </View>
+              </View>
+
+              {/* Broadcast Messages History */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>הודעות שנשלחו</Text>
+                  {loadingMessages && (
+                    <Text style={styles.loadingText}>טוען...</Text>
+                  )}
+                </View>
+                {broadcastMessages.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="mail-outline" size={48} color="#ccc" />
+                    <Text style={styles.emptyStateText}>אין הודעות שנשלחו עדיין</Text>
+                  </View>
+                ) : (
+                  broadcastMessages.map((message) => {
+                    const sentDate = message.sentAt?.toDate ? message.sentAt.toDate() : new Date(message.sentAt);
+                    const dateStr = sentDate.toLocaleDateString('he-IL', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                    return (
+                      <View key={message.id} style={styles.messageCard}>
+                        <View style={styles.messageHeader}>
+                          <View style={styles.messageInfo}>
+                            <Text style={styles.messageTitle}>{message.title}</Text>
+                            <Text style={styles.messageDate}>{dateStr}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.deleteButton}
+                            onPress={() => handleDeleteMessage(message.id)}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="#dc3545" />
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.messageBody}>{message.body}</Text>
+                        <View style={styles.messageFooter}>
+                          <Text style={styles.messageMeta}>
+                            נשלח על ידי: {message.sentByName}
+                          </Text>
+                          <Text style={styles.messageMeta}>
+                            נשלח ל-{message.recipientCount} משתמשים
+                          </Text>
+                          {message.includesSMS && (
+                            <Text style={styles.smsBadge}>SMS</Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
               </View>
 
               {/* Users List */}
@@ -597,6 +701,98 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  messageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  messageInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  messageTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  messageDate: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff5f5',
+  },
+  messageBody: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+    marginBottom: 12,
+    textAlign: 'right',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  messageMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 8,
+  },
+  smsBadge: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+    backgroundColor: '#28a745',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
 });
 

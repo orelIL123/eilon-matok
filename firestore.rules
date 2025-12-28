@@ -134,6 +134,20 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if isAdmin();
     }
+
+    // Admin Settings (notification preferences, cancellation policies, etc.)
+    match /adminSettings/{documentId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Broadcast Messages (history of messages sent to all users)
+    match /broadcastMessages/{messageId} {
+      allow read: if isSignedIn(); // Allow all signed-in users to read broadcast messages
+      allow create: if isAdmin(); // Only admins can create
+      allow update: if isAdmin() || isSignedIn(); // Admins can update all fields, users can only dismiss (update dismissedBy)
+      allow delete: if isAdmin(); // Only admins can delete
+    }
   }
 }
 

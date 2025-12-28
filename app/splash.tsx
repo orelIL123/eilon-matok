@@ -26,6 +26,15 @@ export default function SplashScreen() {
 
         console.log('🔍 SplashScreen: AuthManager initialized, checking auth state...');
 
+        // Request notification permissions on first launch
+        try {
+          const { ensurePermissions } = await import('../services/notifications');
+          await ensurePermissions();
+          console.log('📱 Notification permissions requested');
+        } catch (permError) {
+          console.log('⚠️ Error requesting notification permissions:', permError);
+        }
+
         // First: Check if already authenticated via Firebase persistence
         const isAuthenticated = await authManager.isAuthenticated();
 

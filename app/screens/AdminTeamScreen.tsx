@@ -21,6 +21,7 @@ import {
     Barber,
     checkIsAdmin,
     deleteBarberProfile,
+    deleteImageFromStorage,
     getBarbers,
     getStorageImages,
     getTreatments,
@@ -387,7 +388,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.85, // High quality for best image appearance
       });
 
       console.log('📱 Image picker result:', result);
@@ -507,6 +508,98 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                           console.log('Image loaded successfully for barber:', barber.name, 'URL:', barber.image || barber.photoUrl);
                         }}
                       />
+
+                      {/* כפתורי תמונה - שינוי ומחיקה */}
+                      <View style={styles.imageActionButtons}>
+                        <TouchableOpacity
+                          style={styles.changeImageButton}
+                          onPress={async () => {
+                            try {
+                              const imageData = await pickImageFromDevice();
+                              if (!imageData) return;
+
+                              showToast('מעלה תמונה חדשה...', 'success');
+
+                              let extension = 'jpg';
+                              if (imageData.mimeType?.includes('png')) extension = 'png';
+                              else if (imageData.mimeType?.includes('webp')) extension = 'webp';
+
+                              const fileName = `worker_${Date.now()}.${extension}`;
+                              const downloadURL = await uploadImageToStorage(imageData.uri, 'workers', fileName, imageData.mimeType);
+
+                              // עדכון התמונה בפרופיל הספר
+                              await updateBarberProfile(barber.id, { image: downloadURL });
+
+                              // עדכון מקומי
+                              setBarbers(prev => prev.map(b =>
+                                b.id === barber.id ? { ...b, image: downloadURL } : b
+                              ));
+
+                              showToast('התמונה עודכנה בהצלחה!', 'success');
+                            } catch (error) {
+                              console.error('Error updating image:', error);
+                              showToast('שגיאה בעדכון התמונה', 'error');
+                            }
+                          }}
+                        >
+                          <Ionicons name="camera" size={18} color="#fff" />
+                        </TouchableOpacity>
+                        
+                        {/* כפתור מחיקת תמונה */}
+                        {(barber.image || barber.photoUrl) && (
+                          <TouchableOpacity
+                            style={styles.deleteImageButton}
+                            onPress={async () => {
+                              Alert.alert(
+                                'מחיקת תמונה',
+                                'האם אתה בטוח שברצונך למחוק את התמונה של הספר?',
+                                [
+                                  { text: 'ביטול', style: 'cancel' },
+                                  {
+                                    text: 'מחק',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      try {
+                                        showToast('מוחק תמונה...', 'success');
+                                        const imageUrlToDelete = barber.image || barber.photoUrl;
+                                        
+                                        // Delete from Storage if it's a Firebase Storage URL
+                                        if (imageUrlToDelete && imageUrlToDelete.includes('firebasestorage.googleapis.com')) {
+                                          try {
+                                            await deleteImageFromStorage(imageUrlToDelete);
+                                            console.log('✅ Image deleted from Storage');
+                                          } catch (storageError: any) {
+                                            console.warn('⚠️ Failed to delete from Storage:', storageError.message);
+                                            // Continue even if storage deletion fails
+                                          }
+                                        }
+                                        
+                                        // Remove from barber profile
+                                        await updateBarberProfile(barber.id, { image: '' });
+                                        setBarbers(prev => prev.map(b =>
+                                          b.id === barber.id ? { ...b, image: '', photoUrl: '' } : b
+                                        ));
+                                        
+                                        // Refresh worker images list
+                                        const updatedImages = await getStorageImages('workers');
+                                        setWorkerImages(updatedImages);
+                                        
+                                        showToast('התמונה נמחקה בהצלחה', 'success');
+                                      } catch (error) {
+                                        console.error('Error deleting image:', error);
+                                        showToast('שגיאה במחיקת התמונה', 'error');
+                                      }
+                                    }
+                                  }
+                                ]
+                              );
+                            }}
+                          >
+                            <Ionicons name="trash" size={18} color="#fff" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
                       <TouchableOpacity
                         style={[
                           styles.availabilityBadge,
@@ -736,7 +829,57 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                 {/* Current image preview */}
                 {formData.image && (
                   <View style={styles.currentImageContainer}>
-                    <Text style={styles.currentImageLabel}>תמונה נבחרת:</Text>
+                    <View style={styles.currentImageHeader}>
+                      <Text style={styles.currentImageLabel}>תמונה נבחרת:</Text>
+                      <TouchableOpacity
+                        style={styles.deleteImageInModalButton}
+                        onPress={() => {
+                          Alert.alert(
+                            'מחיקת תמונה',
+                            'האם אתה בטוח שברצונך למחוק את התמונה? התמונה תימחק גם מ-Firebase Storage.',
+                            [
+                              { text: 'ביטול', style: 'cancel' },
+                              {
+                                text: 'מחק',
+                                style: 'destructive',
+                                onPress: async () => {
+                                  try {
+                                    const imageUrlToDelete = formData.image;
+                                    
+                                    // Delete from Storage if it's a Firebase Storage URL
+                                    if (imageUrlToDelete && imageUrlToDelete.includes('firebasestorage.googleapis.com')) {
+                                      try {
+                                        showToast('מוחק תמונה מ-Storage...', 'success');
+                                        await deleteImageFromStorage(imageUrlToDelete);
+                                        console.log('✅ Image deleted from Storage');
+                                      } catch (storageError: any) {
+                                        console.warn('⚠️ Failed to delete from Storage:', storageError.message);
+                                        // Continue even if storage deletion fails
+                                      }
+                                    }
+                                    
+                                    // Remove from form
+                                    setFormData({ ...formData, image: '' });
+                                    
+                                    // Refresh worker images list
+                                    const updatedImages = await getStorageImages('workers');
+                                    setWorkerImages(updatedImages);
+                                    
+                                    showToast('התמונה נמחקה בהצלחה', 'success');
+                                  } catch (error) {
+                                    console.error('Error deleting image:', error);
+                                    showToast('שגיאה במחיקת התמונה', 'error');
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                        }}
+                      >
+                        <Ionicons name="trash" size={20} color="#dc3545" />
+                        <Text style={styles.deleteImageInModalText}>מחק תמונה</Text>
+                      </TouchableOpacity>
+                    </View>
                     <Image
                       source={{ uri: formData.image }}
                       style={styles.currentImagePreview}
@@ -1290,6 +1433,61 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
     textAlign: 'right',
+  },
+  imageActionButtons: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  changeImageButton: {
+    backgroundColor: '#007bff',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  deleteImageButton: {
+    backgroundColor: '#dc3545',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  currentImageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deleteImageInModalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#dc3545',
+  },
+  deleteImageInModalText: {
+    color: '#dc3545',
+    fontSize: 14,
+    fontWeight: '500',
   },
   currentImagePreview: {
     width: 100,

@@ -4,29 +4,30 @@ import { collection, getDocs, getFirestore, onSnapshot, query, QuerySnapshot, Ti
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import {
-    Barber,
-    createAppointment,
-    createWaitlistEntry,
-    getBarberAppointmentsForDay,
-    getBarberAvailableSlots,
-    getBarbers,
-    getCurrentUser,
-    getTreatments,
-    getUserProfile,
-    subscribeToTreatmentsChanges,
-    Treatment
+  Barber,
+  createAppointment,
+  createWaitlistEntry,
+  getBarberAppointmentsForDay,
+  getBarberAvailableSlots,
+  getBarbers,
+  getCurrentUser,
+  getTreatments,
+  getUserProfile,
+  subscribeToTreatmentsChanges,
+  Treatment
 } from '../../services/firebase';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ScissorsLoader from '../components/ScissorsLoader';
@@ -46,37 +47,50 @@ interface BookingScreenProps {
   };
 }
 
-// Optimized Image Component with lazy loading
+// Ultra-Fast Image Component - Aggressive Loading with Prefetch
 const OptimizedImage = memo(({ source, style, resizeMode = 'cover' }: {
   source: any;
   style: any;
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
 }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const imageUri = source?.uri || source;
+
+  // Prefetch image immediately when component mounts
+  useEffect(() => {
+    if (imageUri) {
+      Image.prefetch(imageUri).catch(err => {
+        console.warn('Image prefetch failed:', imageUri, err);
+      });
+    }
+  }, [imageUri]);
+
+  if (hasError) {
+    return (
+      <View style={[style, {
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }]}>
+        <Text style={{ color: '#999', fontSize: 12 }}>✂️</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[style, { backgroundColor: '#f0f0f0' }]}>
-      {!isLoaded && !hasError && (
-        <View style={[style, { 
-          position: 'absolute', 
-          backgroundColor: '#f0f0f0', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }]}>
-          <Text style={{ color: '#999', fontSize: 12 }}>טוען...</Text>
-        </View>
-      )}
-      <Image
-        source={source}
-        style={[style, { opacity: isLoaded ? 1 : 0 }]}
-        resizeMode={resizeMode}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setHasError(true)}
-        fadeDuration={200}
-      />
-    </View>
+    <Image
+      source={source}
+      style={style}
+      resizeMode={resizeMode}
+      onError={() => setHasError(true)}
+      fadeDuration={0} // Instant display - no fade for faster loading
+    />
   );
+}, (prevProps, nextProps) => {
+  // Only re-render if URI changes
+  const prevUri = prevProps.source?.uri || prevProps.source;
+  const nextUri = nextProps.source?.uri || nextProps.source;
+  return prevUri === nextUri;
 });
 OptimizedImage.displayName = 'OptimizedImage';
 
@@ -87,18 +101,17 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  
+
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
-  const [weeklyAvailability, setWeeklyAvailability] = useState<{[key: number]: string[]}>({});
-  const [dateSpecificAvailability, setDateSpecificAvailability] = useState<{[date: string]: string[] | null}>({});
-  const [availableDates, setAvailableDates] = useState<{date: Date, isAvailable: boolean, dayOfWeek: number}[]>([]);
+  const [weeklyAvailability, setWeeklyAvailability] = useState<{ [key: number]: string[] }>({});
+  const [dateSpecificAvailability, setDateSpecificAvailability] = useState<{ [date: string]: string[] | null }>({});
+  const [availableDates, setAvailableDates] = useState<{ date: Date, isAvailable: boolean, dayOfWeek: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [booking, setBooking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [detailsBarber, setDetailsBarber] = useState<Barber | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
@@ -113,10 +126,19 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         getBarbers(),
         getTreatments()
       ]);
-      
+
       setBarbers(barbersData);
       setTreatments(treatmentsData);
-      
+
+      // Prefetch all barber images immediately for instant loading
+      barbersData.forEach(barber => {
+        if (barber.image) {
+          Image.prefetch(barber.image).catch(err => {
+            console.warn('Failed to prefetch barber image:', barber.image, err);
+          });
+        }
+      });
+
       // If barber is pre-selected, set it and skip to next step
       if (preSelectedBarberId) {
         const preSelectedBarber = barbersData.find(b => b.id === preSelectedBarberId);
@@ -137,39 +159,39 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
   const refreshAvailability = async () => {
     if (!selectedBarber) return;
-    
+
     setRefreshing(true);
     try {
       console.log('🔄 Refreshing availability for barber:', selectedBarber.id);
       console.log('🗓️ TODAY\'S DATE FOR SYNC TEST:', new Date().toLocaleDateString());
       const todayDayOfWeek = new Date().getDay();
       console.log('🗓️ TODAY\'S DAY OF WEEK:', todayDayOfWeek);
-      
+
       // No auto-creation here. We only read what's in dailyAvailability.
-      
+
       const db = getFirestore();
-      
+
       // Load DAILY availability first (has priority) - next 14 days
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const dateSpecificSlots: {[date: string]: string[] | null} = {};
+      const dateSpecificSlots: { [date: string]: string[] | null } = {};
 
       for (let i = 0; i <= 14; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         const dateStr = toYMD(checkDate); // CRITICAL FIX: Use toYMD to avoid UTC timezone issues
-        
+
         // Query for ANY dailyAvailability record (not just isAvailable=true)
         const dailyQuery = query(
           collection(db, 'dailyAvailability'),
           where('barberId', '==', selectedBarber.id),
           where('date', '==', dateStr)
         );
-        
+
         const dailySnapshot = await getDocs(dailyQuery);
         dailySnapshot.docs.forEach(doc => {
           const data = doc.data();
-          
+
           if (data.isAvailable === false) {
             // Explicitly unavailable - mark as null to override weekly
             dateSpecificSlots[dateStr] = null;
@@ -180,7 +202,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           }
         });
       }
-      
+
       // Load WEEKLY availability as fallback
       const weeklyQuery = query(
         collection(db, 'availability'),
@@ -189,7 +211,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       );
 
       const weeklySnapshot = await getDocs(weeklyQuery);
-      const weeklySlots: {[key: number]: string[]} = {};
+      const weeklySlots: { [key: number]: string[] } = {};
 
       weeklySnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -219,18 +241,18 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       // NEW APPROACH: We now work ONLY with daily availability, no more weekly!
       // Build availability per dayOfWeek from the CURRENT date-specific slots
-      const finalWeeklySlots: {[key: number]: string[]} = {};
-      
+      const finalWeeklySlots: { [key: number]: string[] } = {};
+
       for (let i = 0; i <= 14; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         const dateStr = toYMD(checkDate); // CRITICAL FIX: Use toYMD to avoid UTC timezone issues
         const dayOfWeek = checkDate.getDay();
-        
+
         // ONLY use date-specific slots (no weekly fallback!)
         if (dateStr in dateSpecificSlots) {
           const dateSlots = dateSpecificSlots[dateStr];
-          
+
           if (dateSlots === null) {
             // Explicitly unavailable
             console.log(`🚫 ${dateStr} (${dayOfWeek}) explicitly UNAVAILABLE`);
@@ -255,11 +277,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       console.log('✅ Refreshed availability (DAILY-ONLY model):', finalWeeklySlots);
       console.log('📊 Date-specific slots loaded:', Object.keys(dateSpecificSlots).length, 'dates');
-      
+
       // Save both for backwards compatibility
       setWeeklyAvailability(finalWeeklySlots);
       setDateSpecificAvailability(dateSpecificSlots); // CRITICAL: Store date-specific data!
-      
+
       // Update available dates
       const dates = generateAvailableDates();
       console.log('📅 Generated available dates after refresh:', dates.map(d => ({
@@ -268,14 +290,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         isAvailable: d.isAvailable
       })));
       setAvailableDates(dates);
-      
+
       // If we have a selected date and treatment, update available times
       if (selectedDate && selectedTreatment) {
         const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
         const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         setAvailableTimes(timeStrings);
       }
-      
+
       Alert.alert('עודכן', 'הזמינות עודכנה בהצלחה!');
     } catch (error) {
       console.error('Error refreshing availability:', error);
@@ -307,7 +329,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         // No auto-creation here. Only reflect existing dailyAvailability.
 
         // Rebuild dateSpecificAvailability from snapshot
-        const dateSpecificSlots: {[date: string]: string[] | null} = {};
+        const dateSpecificSlots: { [date: string]: string[] | null } = {};
 
         snapshot.docs.forEach(doc => {
           const data = doc.data();
@@ -353,12 +375,12 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   // Listen to treatments changes in real-time
   useEffect(() => {
     console.log('🔔 Setting up treatments listener');
-    
+
     const unsubscribe = subscribeToTreatmentsChanges((treatments) => {
       console.log('📡 Treatments updated:', treatments.length, 'treatments');
       setTreatments(treatments);
     });
-    
+
     return () => {
       console.log('🔕 Unsubscribing from treatments changes');
       unsubscribe();
@@ -368,13 +390,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   // Check if a slot is available (no overlap with existing appointments)
   function isSlotAvailable(slotStart: Date, slotDuration: number, appointments: any[]) {
     const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
-    
+
     console.log('Checking slot availability:', {
       slotStart: `${slotStart.getHours()}:${slotStart.getMinutes().toString().padStart(2, '0')}`,
       slotDuration,
       totalAppointments: appointments.length
     });
-    
+
     for (const appt of appointments) {
       try {
         // Handle Firestore Timestamp objects
@@ -392,14 +414,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           console.warn('Appointment missing date/time:', appt);
           continue;
         }
-        
+
         // Use the actual duration from the appointment
         // IMPORTANT: If appointment doesn't have duration, it means it's an old appointment
         // We should use a reasonable default, but ideally all appointments should have duration
         // For old appointments, use 30 minutes as default (most common treatment duration)
         const apptDuration = appt.duration || 30;
         const apptEnd = new Date(apptStart.getTime() + apptDuration * 60000);
-        
+
         console.log('Appointment duration check:', {
           apptId: appt.id,
           hasDuration: !!appt.duration,
@@ -407,10 +429,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           apptStart: `${apptStart.getHours()}:${apptStart.getMinutes().toString().padStart(2, '0')}`,
           apptEnd: `${apptEnd.getHours()}:${apptEnd.getMinutes().toString().padStart(2, '0')}`
         });
-        
+
         // Check for overlap - if any part of the slot overlaps with appointment
         const hasOverlap = slotStart < apptEnd && slotEnd > apptStart;
-        
+
         if (hasOverlap) {
           console.log('❌ Slot blocked by appointment:', {
             slotTime: `${slotStart.getHours()}:${slotStart.getMinutes().toString().padStart(2, '0')}`,
@@ -426,7 +448,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         continue;
       }
     }
-    
+
     console.log('✅ Slot is available');
     return true;
   }
@@ -438,7 +460,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       console.log('Barber ID:', barberId);
       console.log('Date:', date.toDateString());
       console.log('Treatment Duration:', treatmentDuration, 'minutes');
-      
+
       // Get barber's availability for the selected day
       // CRITICAL FIX: Use toYMD to avoid timezone issues (especially after midnight)
       const dateString = toYMD(date);
@@ -471,54 +493,54 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         availableTimeSlots = await getBarberAvailableSlots(barberId, dateString);
         console.log('📅 Database slots loaded:', availableTimeSlots.length, 'slots');
       }
-      
+
       if (availableTimeSlots.length === 0) {
         console.log('❌ Barber not available on this day - NO SLOTS AVAILABLE');
         return [];
       }
-      
+
       console.log('📅 Available time slots:', availableTimeSlots);
-      
+
       const appointments = await getBarberAppointmentsForDay(barberId, date);
       console.log('Found', appointments.length, 'appointments for this day');
-      
+
       const slots = [];
-      
+
       // IMPORTANT: Show slots at intervals matching the treatment duration!
       // For 30-min treatment: 9:00, 9:30, 10:00...
       // For 20-min treatment: 9:00, 9:20, 9:40...
       // For 15-min treatment: 9:00, 9:15, 9:30...
-      
+
       // First, filter slots that can fit the treatment before midnight
       const validSlots = availableTimeSlots.filter(slot => {
         const startMinutes = toMin(slot);
         const endMinutes = startMinutes + treatmentDuration;
         return endMinutes <= 24 * 60;
       });
-      
+
       if (validSlots.length === 0) {
         console.log('❌ No valid slots for this treatment duration');
         return [];
       }
-      
+
       // Generate slot candidates at intervals matching the treatment duration
       // These are times like 9:00, 9:30, 10:00 for 30-min treatments
       const slotCandidates: string[] = [];
-      
+
       // Find the earliest and latest available times
       const sortedSlots = [...validSlots].sort((a, b) => toMin(a) - toMin(b));
       const earliestMinutes = toMin(sortedSlots[0]);
       const latestMinutes = toMin(sortedSlots[sortedSlots.length - 1]);
-      
+
       // Start from the earliest available time, rounded down to nearest treatment interval
       // For 30-min: if first slot is 9:05, we start checking from 9:00
       const startHour = Math.floor(earliestMinutes / 60);
       const firstIntervalMinutes = startHour * 60;
-      
+
       // Generate all possible start times based on treatment duration
       for (let minutes = firstIntervalMinutes; minutes <= latestMinutes; minutes += treatmentDuration) {
         const timeString = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
-        
+
         // Check if this start time AND all slots during the treatment are available
         let allSlotsAvailable = true;
         for (let checkMinutes = minutes; checkMinutes < minutes + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
@@ -528,28 +550,28 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
             break;
           }
         }
-        
+
         if (allSlotsAvailable) {
           slotCandidates.push(timeString);
         }
       }
-      
+
       console.log(`📊 Slot candidates for ${treatmentDuration}min treatment:`, slotCandidates);
-      
+
       // Convert time strings to Date objects and check for appointment overlaps
       for (const slotTimeString of slotCandidates) {
         const [hour, minute] = slotTimeString.split(':').map(Number);
         const slotStart = new Date(date);
         slotStart.setHours(hour, minute, 0, 0);
-        
+
         // Skip past times if it's today
         const now = new Date();
         if (date.toDateString() === now.toDateString() && slotStart <= now) {
           continue;
         }
-        
+
         const displayTime = `${slotStart.getHours().toString().padStart(2, '0')}:${slotStart.getMinutes().toString().padStart(2, '0')}`;
-        
+
         // Check for appointment overlaps
         if (isSlotAvailable(slotStart, treatmentDuration, appointments)) {
           slots.push(slotStart);
@@ -558,10 +580,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           console.log(`❌ Slot blocked by appointment: ${displayTime}`);
         }
       }
-      
+
       console.log('Generated', slots.length, 'available time slots');
       console.log('Available times:', slots.map(s => `${s.getHours()}:${s.getMinutes().toString().padStart(2, '0')}`));
-      
+
       return slots;
     } catch (error) {
       console.error('Error generating available slots:', error);
@@ -573,7 +595,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const generateAvailableDates = () => {
     const dates = [];
     const today = new Date();
-    
+
     // Start from today (i = 0) and go up to 14 days
     for (let i = 0; i <= 14; i++) {
       const date = new Date(today);
@@ -584,7 +606,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       const dateStr = toYMD(date);
       const [Y, M, D] = dateStr.split('-').map(Number);
       const dayOfWeek = new Date(Y, M - 1, D).getDay();
-      
+
       // CRITICAL: Check date-specific availability ONLY (no weekly fallback!)
       let isAvailable = false;
       if (selectedBarber) {
@@ -601,14 +623,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       } else {
         isAvailable = true; // No barber selected yet
       }
-      
+
       dates.push({
         date,
         isAvailable,
         dayOfWeek
       });
     }
-    
+
     return dates;
   };
 
@@ -619,10 +641,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     setAvailableTimes([]);
     setSelectedDate(null);
     setSelectedTime(null);
-    
+
     setSelectedBarber(barber);
     setCurrentStep(2);
-    
+
     console.log('🔄 Barber changed, reset availability for new barber:', barber.name);
     // No auto-creation. Customer reflects admin exactly.
   };
@@ -653,13 +675,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         const slots = await generateAvailableSlots(selectedBarber.id, date, selectedTreatment.duration);
         const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         console.log('🎯 DATE SELECTED: Final timeStrings generated:', timeStrings);
-        
+
         // If no slots available, check if barber has availability for this day
         if (timeStrings.length === 0) {
           console.log('No slots available, checking barber availability');
           const dayOfWeek = date.getDay();
           const hasAvailability = weeklyAvailability[dayOfWeek] && weeklyAvailability[dayOfWeek].length > 0;
-          
+
           if (!hasAvailability) {
             console.log('Barber not available on this day - no fallback times');
             setAvailableTimes([]);
@@ -675,7 +697,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         // Don't use fallback times - respect admin's availability settings
         const dayOfWeek = date.getDay();
         const hasAvailability = weeklyAvailability[dayOfWeek] && weeklyAvailability[dayOfWeek].length > 0;
-        
+
         if (!hasAvailability) {
           console.log('Barber not available on this day - no fallback times');
           setAvailableTimes([]);
@@ -709,9 +731,9 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     try {
       // Get user profile for display name and phone
       const userProfile = await getUserProfile(user.uid);
-      
+
       const dateStr = toYMD(selectedDate);
-      
+
       await createWaitlistEntry({
         userId: user.uid,
         barberId: selectedBarber.id,
@@ -762,7 +784,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       // Double-check availability before creating appointment
       const existingAppointments = await getBarberAppointmentsForDay(selectedBarber.id, selectedDate);
       const isStillAvailable = isSlotAvailable(appointmentDateTime, selectedTreatment.duration, existingAppointments);
-      
+
       if (!isStillAvailable) {
         Alert.alert(
           t('booking.slot_taken'),
@@ -781,7 +803,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       }
 
       console.log('📅 Creating appointment with userId:', user.uid);
-      
+
       await createAppointment({
         userId: user.uid,
         barberId: selectedBarber.id,
@@ -793,19 +815,16 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       console.log('Appointment created successfully');
       setShowConfirmModal(false);
-      setSuccessMessage(t('booking.appointment_details', { 
-        date: selectedDate.toLocaleDateString('he-IL'), 
-        time: selectedTime 
+      setSuccessMessage(t('booking.appointment_details', {
+        date: selectedDate.toLocaleDateString('he-IL'),
+        time: selectedTime
       }));
       setShowSuccessModal(true);
 
-      // אחרי יצירת התור בהצלחה:
-      if (selectedDate && selectedTime && selectedTreatment) {
-        const [hours, minutes] = selectedTime.split(":").map(Number);
-        const appointmentDate = new Date(selectedDate);
-        appointmentDate.setHours(hours, minutes, 0, 0);
-        await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
-      }
+      // אחרי יצירת התור בהצלחה - השתמש באותו תאריך שיצרנו למעלה
+      // לא צריך ליצור תאריך חדש, רק לוודא שהתאריך נכון
+      // התזכורות יטופלו על ידי המערכת המרכזית ב-firebase.ts
+      // לא צריך לקרוא ל-scheduleAppointmentReminders כאן כי זה יוצר כפילות
 
     } catch (error) {
       console.error('Error creating appointment:', error);
@@ -828,7 +847,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const goBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
-      
+
       switch (currentStep) {
         case 2:
           if (!preSelectedBarberId) {
@@ -851,7 +870,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
       'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
     ];
-    
+
     return `יום ${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
@@ -864,6 +883,19 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       default: return 'הזמנת תור';
     }
   };
+
+  // Animation state for fade-in
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    // Fade in animation when step changes
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [currentStep]);
 
   // פונקציה לתזמון התראות פוש ללקוח שעה ורבע שעה לפני התור
   const scheduleAppointmentReminders = async (appointmentDate: Date, treatmentName: string) => {
@@ -936,10 +968,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopNav 
-          title={t('booking.title')} 
-          onBellPress={() => {}} 
-          onMenuPress={() => {}} 
+        <TopNav
+          title={t('booking.title')}
+          onBellPress={() => { }}
+          onMenuPress={() => { }}
           showBackButton={true}
           onBackPress={onBack}
           showCloseButton={true}
@@ -954,16 +986,16 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
   return (
     <SafeAreaView style={styles.container}>
-      <TopNav 
-        title={t('booking.title')} 
-        onBellPress={() => {}} 
-        onMenuPress={() => {}} 
+      <TopNav
+        title={t('booking.title')}
+        onBellPress={() => { }}
+        onMenuPress={() => { }}
         showBackButton={true}
         onBackPress={onBack}
         showCloseButton={true}
         onClosePress={onClose}
       />
-      
+
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
@@ -985,7 +1017,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Step 1: Select Barber */}
         {currentStep === 1 && (
-          <View style={styles.stepContent}>
+          <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
+            {/* Background gradient for glass effect */}
+            <LinearGradient
+              colors={['rgba(139,69,19,0.05)', 'rgba(255,255,255,0.02)', 'rgba(139,69,19,0.03)']}
+              style={styles.backgroundGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
             {barbers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateIcon}>✂️</Text>
@@ -993,7 +1032,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 <Text style={styles.emptyStateText}>
                   אנא פנה למנהל המערכת להוספת ספרים למערכת
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.emptyStateButton}
                   onPress={onBack}
                 >
@@ -1001,7 +1040,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.barbersGrid}>
+              <View style={styles.barbersList}>
                 {barbers.map((barber) => (
                   <TouchableOpacity
                     key={barber.id}
@@ -1013,14 +1052,28 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     disabled={false}
                   >
                     <LinearGradient
-                      colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                      colors={selectedBarber?.id === barber.id 
+                        ? ['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0.85)']
+                        : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.8)']
+                      }
                       style={styles.barberGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                     >
+                      {/* Glass effect overlay */}
+                      <View style={styles.glassOverlay} />
+                      
+                      {/* Glossy highlight */}
+                      <LinearGradient
+                        colors={['rgba(255,255,255,0.6)', 'rgba(255,255,255,0.1)', 'transparent']}
+                        style={styles.glossyHighlight}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                      />
+                      
                       <View style={styles.barberImage}>
                         {barber.image ? (
-                          <Image
+                          <OptimizedImage
                             source={{ uri: barber.image }}
                             style={styles.barberPhoto}
                             resizeMode="cover"
@@ -1029,22 +1082,36 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                           <Text style={styles.barberPlaceholder}>✂️</Text>
                         )}
                       </View>
-                      <Text style={styles.barberName}>{barber.name}</Text>
-                      <Text style={styles.barberExperience}>{barber.experience}</Text>
-                      <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
-                        <Text style={styles.detailsButtonText}>{t('booking.details')}</Text>
+                      
+                      <TouchableOpacity 
+                        style={styles.bookButton} 
+                        onPress={() => handleBarberSelect(barber)}
+                      >
+                        <LinearGradient
+                          colors={['#8B4513', '#A0522D', '#8B4513']}
+                          style={styles.bookButtonGradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                        >
+                          <Text style={styles.bookButtonText}>הזמנת תור</Text>
+                        </LinearGradient>
                       </TouchableOpacity>
+                      
+                      <View style={styles.barberInfoContainer}>
+                        <Text style={styles.barberName}>{barber.name}</Text>
+                        <Text style={styles.barberExperience}>{barber.experience}</Text>
+                      </View>
                     </LinearGradient>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
-          </View>
+          </Animated.View>
         )}
 
         {/* Step 2: Select Treatment */}
         {currentStep === 2 && (
-          <View style={styles.stepContent}>
+          <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
             <View style={styles.treatmentsContainer}>
               {treatments.map((treatment) => (
                 <TouchableOpacity
@@ -1076,12 +1143,12 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* Step 3: Select Date */}
         {currentStep === 3 && (
-          <View style={styles.stepContent}>
+          <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
             {/* Refresh Button */}
             <View style={styles.refreshContainer}>
               <TouchableOpacity
@@ -1094,7 +1161,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.datesContainer}>
               {availableDates.length > 0 ? availableDates.map((dateObj, index) => (
                 <TouchableOpacity
@@ -1154,12 +1221,12 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* Step 4: Select Time */}
         {currentStep === 4 && (
-          <View style={styles.stepContent}>
+          <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
             {/* Refresh Button */}
             <View style={styles.refreshContainer}>
               <TouchableOpacity
@@ -1172,7 +1239,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             {availableTimes.length === 0 ? (
               <View style={styles.noSlotsContainer}>
                 <Text style={styles.noSlotsEmoji}>😔</Text>
@@ -1203,10 +1270,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 ))}
               </View>
             )}
-            
+
             {/* Waitlist Box */}
             {selectedDate && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.waitlistBox}
                 onPress={() => setShowWaitlistModal(true)}
               >
@@ -1222,7 +1289,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 </LinearGradient>
               </TouchableOpacity>
             )}
-          </View>
+          </Animated.View>
         )}
 
         {/* Selected Summary */}
@@ -1235,28 +1302,28 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
               end={{ x: 1, y: 1 }}
             >
               <Text style={styles.summaryTitle}>{t('booking.booking_summary')}</Text>
-              
+
               {selectedBarber && (
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>{t('booking.barber')}</Text>
                   <Text style={styles.summaryValue}>{selectedBarber.name}</Text>
                 </View>
               )}
-              
+
               {selectedTreatment && (
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>{t('booking.treatment')}</Text>
                   <Text style={styles.summaryValue}>{selectedTreatment.name}</Text>
                 </View>
               )}
-              
+
               {selectedDate && (
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>{t('booking.date')}</Text>
                   <Text style={styles.summaryValue}>{formatDate(selectedDate)}</Text>
                 </View>
               )}
-              
+
               {selectedTime && (
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>{t('booking.time')}</Text>
@@ -1278,7 +1345,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t('booking.confirm_booking')}</Text>
-            
+
             <View style={styles.confirmationDetails}>
               <Text style={styles.confirmationText}>
                 {t('booking.barber')} {selectedBarber?.name}
@@ -1307,7 +1374,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   {booking ? t('common.loading') : t('booking.confirm_booking')}
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowConfirmModal(false)}
@@ -1320,35 +1387,6 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         </View>
       </Modal>
 
-      {/* Barber Details Modal */}
-      <Modal
-        visible={!!detailsBarber}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailsBarber(null)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: 320, alignItems: 'center' }}>
-            {detailsBarber?.image && (
-              <Image source={{ uri: detailsBarber.image }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
-            )}
-            <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>{detailsBarber?.name}</Text>
-            <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>{detailsBarber?.experience}</Text>
-            {detailsBarber?.phone && (
-              <Text style={{ fontSize: 16, color: '#8B4513', marginBottom: 8 }}>{t('profile.phone')} {detailsBarber.phone}</Text>
-            )}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-              {/* אייקון וואטסאפ */}
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                <Text style={{ color: '#fff', fontSize: 20 }}>🟢</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => setDetailsBarber(null)} style={{ marginTop: 18 }}>
-              <Text style={{ color: '#8B4513', fontWeight: 'bold' }}>{t('common.close')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Success Modal */}
       <ConfirmationModal
@@ -1380,19 +1418,19 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>רשימת המתנה 📋</Text>
-            
+
             <View style={styles.waitlistModalContent}>
               <Text style={styles.waitlistModalSubtitle}>
                 ליום: {selectedDate?.toLocaleDateString('he-IL')}
               </Text>
-              
+
               <Text style={styles.waitlistLabel}>לאיזה שעה תעדיף?</Text>
               <Text style={styles.waitlistHint}>אנא כתוב טווח שעות רצוי</Text>
-              
+
               <View style={styles.timeRangeContainer}>
                 <View style={styles.timeInputContainer}>
                   <Text style={styles.timeLabel}>משעה:</Text>
-                  <ScrollView 
+                  <ScrollView
                     style={styles.timePicker}
                     showsVerticalScrollIndicator={true}
                   >
@@ -1415,10 +1453,10 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     ))}
                   </ScrollView>
                 </View>
-                
+
                 <View style={styles.timeInputContainer}>
                   <Text style={styles.timeLabel}>עד שעה:</Text>
-                  <ScrollView 
+                  <ScrollView
                     style={styles.timePicker}
                     showsVerticalScrollIndicator={true}
                   >
@@ -1442,7 +1480,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   </ScrollView>
                 </View>
               </View>
-              
+
               <Text style={styles.waitlistSummary}>
                 טווח שעות מבוקש: {waitlistTimeStart} - {waitlistTimeEnd}
               </Text>
@@ -1455,7 +1493,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
               >
                 <Text style={styles.confirmButtonText}>הירשם לרשימת המתנה</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowWaitlistModal(false)}
@@ -1473,7 +1511,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f2f5',
   },
   loadingContainer: {
     flex: 1,
@@ -1508,18 +1546,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#f0f0f0',
   },
   stepTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#222',
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   backButton: {
     paddingHorizontal: 16,
@@ -1537,6 +1578,16 @@ const styles = StyleSheet.create({
   },
   stepContent: {
     padding: 16,
+    position: 'relative',
+    minHeight: 400,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
   },
   barbersGrid: {
     flexDirection: 'row',
@@ -1544,58 +1595,115 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   barberCard: {
-    width: (width - 48) / 2,
-    borderRadius: 20,
-    marginBottom: 16,
+    width: width - 32,
+    height: 110,
+    borderRadius: 24,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  barbersList: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
   barberGradient: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
+    justifyContent: 'flex-end',
+    height: '100%',
+    borderRadius: 24,
+    position: 'relative',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    gap: 12,
+  },
+  glassOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  glossyHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    borderRadius: 24,
+    zIndex: 1,
+  },
+  barberPhoto: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   selectedCard: {
     borderWidth: 2,
     borderColor: '#8B4513',
     shadowColor: '#8B4513',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+    transform: [{ scale: 1.02 }],
   },
   barberImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    marginBottom: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.5)',
+    marginLeft: 'auto',
   },
   barberPlaceholder: {
     fontSize: 30,
-    color: '#fff',
+    color: '#333',
+  },
+  barberInfoContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 8,
+    marginRight: 8,
   },
   barberName: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#1a1a1a',
     marginBottom: 4,
-    textAlign: 'center',
+    textAlign: 'right',
+    textShadowColor: 'rgba(255,255,255,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   barberExperience: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
+    color: '#555',
+    textAlign: 'right',
+    fontWeight: '500',
   },
   unavailableBadge: {
     position: 'absolute',
@@ -1612,43 +1720,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     opacity: 0.8,
   },
-  barberPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: '#fff',
-    marginBottom: 6,
-  },
   treatmentsContainer: {
     marginBottom: 16,
   },
   treatmentCard: {
-    borderRadius: 20,
+    borderRadius: 24,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#8B4513',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
   },
   treatmentGradient: {
     padding: 20,
     flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   treatmentImage: {
     width: 80,
     height: 80,
-    borderRadius: 16,
-    marginRight: 16,
+    borderRadius: 20,
+    marginLeft: 16,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   treatmentPlaceholder: {
     fontSize: 30,
@@ -1691,14 +1798,16 @@ const styles = StyleSheet.create({
   },
   dateCard: {
     width: (width - 48) / 2,
-    borderRadius: 20,
+    borderRadius: 24,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#8B4513',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
   },
   unavailableCard: {
     opacity: 0.6,
@@ -1706,8 +1815,8 @@ const styles = StyleSheet.create({
   dateGradient: {
     padding: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   dateText: {
     fontSize: 14,
@@ -1733,20 +1842,22 @@ const styles = StyleSheet.create({
   },
   timeCard: {
     width: (width - 60) / 3,
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: '#8B4513',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
   },
   timeGradient: {
     padding: 18,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   timeText: {
     fontSize: 16,
@@ -1755,18 +1866,20 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     margin: 16,
-    borderRadius: 20,
-    shadowColor: '#000',
+    borderRadius: 24,
+    shadowColor: '#8B4513',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
   },
   summaryGradient: {
     padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   summaryTitle: {
     fontSize: 18,
@@ -1854,17 +1967,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  detailsButton: {
-    backgroundColor: '#8B4513',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+  bookButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#8B4513',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 120,
     marginTop: 8,
+    alignSelf: 'flex-end',
   },
-  detailsButtonText: {
+  bookButtonGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 15,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   refreshContainer: {
     marginBottom: 16,

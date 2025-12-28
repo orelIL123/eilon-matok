@@ -14,6 +14,8 @@ import {
 import {
     clearAllUserNotifications,
     deleteOldNotifications,
+    dismissBroadcastMessage,
+    getActiveBroadcastMessages,
     getCurrentUser,
     getUserNotifications,
     markNotificationAsRead
@@ -23,11 +25,12 @@ const {} = Dimensions.get('window');
 
 interface Notification {
   id: string;
-  type: 'appointment' | 'general' | 'reminder';
+  type: 'appointment' | 'general' | 'reminder' | 'broadcast';
   title: string;
   message: string;
   time: string;
   isRead: boolean;
+  isBroadcast?: boolean; // Flag to identify broadcast messages
 }
 
 interface NotificationPanelProps {
@@ -51,12 +54,36 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
       setLoading(true);
       const user = getCurrentUser();
       if (user) {
-        // First, delete old notifications (older than 6 hours)
-        await deleteOldNotifications(user.uid, 6);
-        
-        // Then load remaining notifications
+        // Load user-specific notifications
         const userNotifications = await getUserNotifications(user.uid);
-        setNotifications(userNotifications);
+
+        // Load active broadcast messages (not dismissed by this user)
+        const broadcastMessages = await getActiveBroadcastMessages(user.uid);
+
+        // Convert broadcast messages to notification format
+        const broadcastNotifications: Notification[] = broadcastMessages.map(msg => ({
+          id: msg.id,
+          type: 'broadcast' as const,
+          title: msg.title,
+          message: msg.body,
+          time: msg.sentAt?.toDate?.()?.toLocaleString('he-IL', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) || 'לא ידוע',
+          isRead: false, // Broadcast messages are always "unread" until dismissed
+          isBroadcast: true
+        }));
+
+        // Combine and sort by time (newest first)
+        const allNotifications = [...broadcastNotifications, ...userNotifications];
+        setNotifications(allNotifications);
+
+        // Delete old notifications in background (don't wait for it) - 48 hours
+        deleteOldNotifications(user.uid, 48).catch(err => {
+          console.error('Error deleting old notifications:', err);
+        });
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -71,8 +98,10 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
         return 'calendar';
       case 'reminder':
         return 'alarm';
-      case 'general':
+      case 'broadcast':
         return 'megaphone';
+      case 'general':
+        return 'notifications';
       default:
         return 'notifications';
     }
@@ -84,6 +113,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
         return '#007bff';
       case 'reminder':
         return '#FF9800';
+      case 'broadcast':
+        return '#8B4513'; // Brown color for broadcast
       case 'general':
         return '#28a745';
       default:
@@ -92,23 +123,46 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    // Mark as read
-    if (!notification.isRead) {
-      try {
-        await markNotificationAsRead(notification.id);
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
-        );
-      } catch (error) {
-        console.error('Error marking notification as read:', error);
+    // If it's a broadcast message, show with dismiss option
+    if (notification.isBroadcast) {
+      Alert.alert(
+        notification.title,
+        notification.message,
+        [
+          { text: 'סגור', style: 'cancel' },
+          {
+            text: 'סמן כנקרא (לא להציג שוב)',
+            style: 'default',
+            onPress: async () => {
+              const user = getCurrentUser();
+              if (user) {
+                await dismissBroadcastMessage(notification.id, user.uid);
+                // Remove from list
+                setNotifications(prev => prev.filter(n => n.id !== notification.id));
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      // Mark regular notification as read
+      if (!notification.isRead) {
+        try {
+          await markNotificationAsRead(notification.id);
+          setNotifications(prev =>
+            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+          );
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+        }
       }
-    }
 
-    Alert.alert(
-      notification.title,
-      notification.message,
-      [{ text: 'סגור', style: 'default' }]
-    );
+      Alert.alert(
+        notification.title,
+        notification.message,
+        [{ text: 'סגור', style: 'default' }]
+      );
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -182,15 +236,17 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
               </View>
             ) : (
               notifications.map((notification) => (
-                <TouchableOpacity
+                <View
                   key={notification.id}
                   style={[
                     styles.notificationItem,
                     !notification.isRead && styles.unreadNotification
                   ]}
-                  onPress={() => handleNotificationPress(notification)}
                 >
-                  <View style={styles.notificationContent}>
+                  <TouchableOpacity
+                    style={styles.notificationContent}
+                    onPress={() => handleNotificationPress(notification)}
+                  >
                     <View style={styles.notificationHeader}>
                       <View style={styles.notificationLeft}>
                         <Ionicons
@@ -209,11 +265,28 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose 
                     <Text style={styles.notificationMessage}>
                       {notification.message}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
+                  {!notification.isRead && !notification.isBroadcast && (
+                    <TouchableOpacity
+                      style={styles.markReadButton}
+                      onPress={async () => {
+                        try {
+                          await markNotificationAsRead(notification.id);
+                          setNotifications(prev =>
+                            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+                          );
+                        } catch (error) {
+                          console.error('Error marking notification as read:', error);
+                        }
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={24} color="#007bff" />
+                    </TouchableOpacity>
+                  )}
                   {!notification.isRead && (
                     <View style={styles.unreadDot} />
                   )}
-                </TouchableOpacity>
+                </View>
               ))
             )}
           </ScrollView>
@@ -293,6 +366,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     position: 'relative',
+  },
+  markReadButton: {
+    marginLeft: 8,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   unreadNotification: {
     backgroundColor: '#e3f2fd',

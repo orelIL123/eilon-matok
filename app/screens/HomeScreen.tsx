@@ -5,23 +5,24 @@ import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'fi
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActionSheetIOS,
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    ImageBackground,
-    InteractionManager,
-    Linking,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActionSheetIOS,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  ImageBackground,
+  InteractionManager,
+  Linking,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { getActiveBroadcastMessages, getCurrentUser, getUserNotifications } from '../../services/firebase';
 import NotificationPanel from '../components/NotificationPanel';
 import ScissorsLoader from '../components/ScissorsLoader';
 import SideMenu from '../components/SideMenu';
@@ -37,6 +38,52 @@ interface HomeScreenProps {
 
 
 // Simple NeonButton component
+// Ultra-Fast Gallery Image Component - Aggressive Loading
+const OptimizedGalleryImage = React.memo(({ source, style }: {
+  source: { uri: string };
+  style: any;
+  priority?: boolean;
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  // Start loading immediately when component mounts
+  useEffect(() => {
+    // Prefetch image to cache
+    Image.prefetch(source.uri).catch((err) => {
+      console.warn('Image prefetch failed:', source.uri, err);
+    });
+  }, [source.uri]);
+
+  if (hasError) {
+    return (
+      <View style={[style, {
+        backgroundColor: '#1a1a1a',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }]}>
+        <Ionicons name="image-outline" size={32} color="#555" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={source}
+      style={style}
+      resizeMode="cover"
+      onError={(error) => {
+        console.warn('Image load error:', source.uri, error);
+        setHasError(true);
+      }}
+      fadeDuration={0} // Instant display - no fade
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if URI changes
+  return prevProps.source.uri === nextProps.source.uri;
+});
+OptimizedGalleryImage.displayName = 'OptimizedGalleryImage';
+
 const NeonButton: React.FC<{
   title: string;
   onPress: () => void;
@@ -86,8 +133,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [subtitleMessage, setSubtitleMessage] = useState('');
   const [aboutUsMessage, setAboutUsMessage] = useState('');
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -199,6 +245,27 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   }, [loading]);
 
+  // Load notification count
+  const loadNotificationCount = useCallback(async () => {
+    try {
+      const user = getCurrentUser();
+      if (user) {
+        // Load user-specific notifications
+        const notifications = await getUserNotifications(user.uid);
+        const unreadCount = notifications.filter(n => !n.isRead).length;
+
+        // Load active broadcast messages (not dismissed)
+        const broadcastMessages = await getActiveBroadcastMessages(user.uid);
+        const broadcastCount = broadcastMessages.length;
+
+        // Total unread = user notifications + active broadcasts
+        setUnreadNotificationCount(unreadCount + broadcastCount);
+      }
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const task = InteractionManager.runAfterInteractions(async () => {
@@ -206,14 +273,15 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         await Promise.all([
           fetchImages(),
           fetchDynamicContent(),
-          cleanupOldWaitlistData()
+          cleanupOldWaitlistData(),
+          loadNotificationCount()
         ]);
         // Stop loading after data is fetched
         setLoading(false);
       });
 
       return () => task.cancel();
-    }, [])
+    }, [loadNotificationCount])
   );
 
   // Cleanup old waitlist entries (runs automatically on app start)
@@ -247,26 +315,16 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       const aboutDoc = await getDoc(doc(db, 'settings', 'aboutUsText'));
       if (aboutDoc.exists()) {
         const data = aboutDoc.data();
-        setAboutUsMessage(data.text || 'ברוכים הבאים למספרת אילון מתוק! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. גל, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+        setAboutUsMessage(data.text || 'ברוכים הבאים למספרת אילון מתוק!\n\nאנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי.\n\nהצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.\n\nבואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.');
       } else {
-        setAboutUsMessage('ברוכים הבאים למספרת אילון מתוק! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. גל, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
-      }
-
-      // Check for popup message
-      const popupDoc = await getDoc(doc(db, 'settings', 'popupMessage'));
-      if (popupDoc.exists()) {
-        const data = popupDoc.data();
-        if (data.isActive && data.message && data.expiresAt && data.expiresAt.toDate() > new Date()) {
-          setPopupMessage(data.message);
-          setShowPopup(true);
-        }
+        setAboutUsMessage('ברוכים הבאים למספרת אילון מתוק!\n\nאנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי.\n\nהצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.\n\nבואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.');
       }
     } catch (error) {
       console.warn('Failed to fetch dynamic content:', error);
       // Fallback to translation values
       setWelcomeMessage(t('home.welcome'));
       setSubtitleMessage(t('home.subtitle'));
-      setAboutUsMessage('ברוכים הבאים למספרת אילון מתוק! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. גל, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+      setAboutUsMessage('ברוכים הבאים למספרת אילון מתוק!\n\nאנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי.\n\nהצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.\n\nבואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.');
     }
   };
 
@@ -276,25 +334,42 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       const db = getFirestore();
 
       // Load gallery images from the gallery collection
-      const galleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-      const gallerySnapshot = await getDocs(galleryQuery);
-      const galleryImages: string[] = [];
+      let gallerySnapshot;
+      let galleryImages: string[] = [];
+      
+      try {
+        // Try query with isActive filter first
+        const galleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
+        gallerySnapshot = await getDocs(galleryQuery);
+        console.log('✅ Loaded gallery images with isActive filter:', gallerySnapshot.size);
+      } catch (queryError: any) {
+        // If query fails (e.g., missing index), fallback to loading all images
+        console.warn('⚠️ Query with isActive filter failed, falling back to loading all images:', queryError);
+        gallerySnapshot = await getDocs(collection(db, 'gallery'));
+        console.log('✅ Fallback: Loaded all gallery images:', gallerySnapshot.size);
+      }
+
+      const galleryImagesWithOrder: Array<{url: string, order: number}> = [];
 
       gallerySnapshot.forEach((doc) => {
         const data = doc.data();
+        // Filter by type and isActive (if available) on client side
         if (data.type === 'gallery' && data.imageUrl) {
-          galleryImages.push(data.imageUrl);
+          // If we loaded all images (fallback), filter by isActive on client side
+          if (data.isActive !== false) { // Include if isActive is true or undefined
+            galleryImagesWithOrder.push({
+              url: data.imageUrl,
+              order: data.order || 0
+            });
+          }
         }
       });
 
-      // Sort by order if available
-      galleryImages.sort((a, b) => {
-        const docA = gallerySnapshot.docs.find(doc => doc.data().imageUrl === a);
-        const docB = gallerySnapshot.docs.find(doc => doc.data().imageUrl === b);
-        const orderA = docA?.data().order || 0;
-        const orderB = docB?.data().order || 0;
-        return orderA - orderB;
-      });
+      // Sort by order
+      galleryImagesWithOrder.sort((a, b) => a.order - b.order);
+
+      // Extract URLs
+      galleryImages = galleryImagesWithOrder.map(img => img.url);
 
       // Load atmosphere and about us images from settings
       let atmosphereImage = '';
@@ -338,7 +413,9 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         atmosphere: atmosphereImage ? '✅ Found' : '❌ Not found',
         aboutUs: aboutUsImage ? '✅ Found' : '❌ Not found',
         galleryCount: galleryImages.length,
-        galleryImages: galleryImages.slice(0, 2) // Show first 2 URLs
+        galleryImages: galleryImages.slice(0, 5), // Show first 5 URLs
+        totalDocsInCollection: gallerySnapshot.size,
+        activeDocs: gallerySnapshot.docs.filter(doc => doc.data().isActive !== false).length
       });
 
       // Check if we have placeholder images
@@ -353,75 +430,18 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         ));
       }
 
-      // If no gallery images found, initialize with default images
+      // If no gallery images found, log for debugging
       if (galleryImages.length === 0) {
-        console.log('🔍 No gallery images found. Checking all gallery collection documents...');
+        console.log('🔍 No gallery images found. Gallery will remain empty until images are added from admin panel.');
         const allGallerySnapshot = await getDocs(collection(db, 'gallery'));
-        console.log('📋 All gallery collection documents:');
+        console.log('📋 All gallery collection documents:', allGallerySnapshot.size);
         allGallerySnapshot.forEach((doc) => {
           console.log('Document ID:', doc.id, 'Data:', doc.data());
         });
-
-        // Try to initialize gallery with default images
-        try {
-          console.log('🚀 Initializing gallery with default images...');
-          const { initializeGalleryImages } = await import('../../services/firebase');
-          await initializeGalleryImages();
-
-          // Reload images after initialization
-          console.log('🔄 Reloading images after initialization...');
-          const refreshedGalleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-          const refreshedGallerySnapshot = await getDocs(refreshedGalleryQuery);
-          const refreshedGalleryImages: string[] = [];
-
-          refreshedGallerySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.type === 'gallery' && data.imageUrl) {
-              refreshedGalleryImages.push(data.imageUrl);
-            }
-          });
-
-          if (refreshedGalleryImages.length > 0) {
-            setSettingsImages(prev => ({
-              ...prev,
-              gallery: refreshedGalleryImages,
-            }));
-            console.log('✅ Gallery initialized with', refreshedGalleryImages.length, 'images');
-          }
-        } catch (initError) {
-          console.error('❌ Failed to initialize gallery:', initError);
-        }
-      } else if (hasPlaceholders) {
-        // If we have placeholder images, try to replace them automatically
-        try {
-          console.log('🔄 Auto-replacing placeholder images...');
-          const { replaceGalleryPlaceholders } = await import('../../services/firebase');
-          await replaceGalleryPlaceholders();
-
-          // Reload images after replacement
-          console.log('🔄 Reloading images after replacement...');
-          const refreshedGalleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-          const refreshedGallerySnapshot = await getDocs(refreshedGalleryQuery);
-          const refreshedGalleryImages: string[] = [];
-
-          refreshedGallerySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.type === 'gallery' && data.imageUrl) {
-              refreshedGalleryImages.push(data.imageUrl);
-            }
-          });
-
-          if (refreshedGalleryImages.length > 0) {
-            setSettingsImages(prev => ({
-              ...prev,
-              gallery: refreshedGalleryImages,
-            }));
-            console.log('✅ Gallery placeholders replaced with', refreshedGalleryImages.length, 'real images');
-          }
-        } catch (replaceError) {
-          console.error('❌ Failed to replace placeholders:', replaceError);
-        }
       }
+
+      // REMOVED: Automatic gallery initialization and placeholder replacement
+      // Users should manage their own images from admin panel
     } catch (err) {
       console.warn('Failed to fetch Firebase images:', err);
     }
@@ -498,13 +518,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   };
 
   const handlePhoneCall = () => {
-    Linking.openURL('tel:+972508315000').catch(() => {
+    Linking.openURL('tel:+972508315002').catch(() => {
       Alert.alert(t('common.error'), t('errors.phone_error'));
     });
   };
 
   const handleWhatsApp = () => {
-    Linking.openURL('https://wa.me/972508315000').catch(() => {
+    Linking.openURL('https://wa.me/972508315002').catch(() => {
       Alert.alert(t('common.error'), t('errors.whatsapp_error'));
     });
   };
@@ -606,6 +626,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         title="eilon matok"
         onBellPress={() => setNotificationPanelVisible(true)}
         onMenuPress={() => setSideMenuVisible(true)}
+        badgeCount={unreadNotificationCount}
       />
       <View style={styles.backgroundWrapper}>
         {/* Local image - loads fast */}
@@ -793,27 +814,30 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                   )}
                   scrollEventThrottle={16}
                 >
-                  {infiniteImages.map((img, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        const imageUrl = typeof img === 'string' ? img : (img as any).uri || img;
-                        setSelectedImage(imageUrl);
-                        setShowImageModal(true);
-                      }}
-                      activeOpacity={0.9}
-                    >
-                      <Animated.View
-                        style={[
-                          styles.carousel3DCard,
-                          getCardTransform(index, scrollX),
-                        ]}
+                  {infiniteImages.map((img, index) => {
+                    // Priority loading for first 3 images (visible on screen)
+                    const priority = index < 3;
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          const imageUrl = typeof img === 'string' ? img : (img as any).uri || img;
+                          setSelectedImage(imageUrl);
+                          setShowImageModal(true);
+                        }}
+                        activeOpacity={0.9}
                       >
-                        <Image
-                          source={typeof img === 'string' ? { uri: img } : img}
-                          style={styles.carousel3DImage}
-                          resizeMode="cover"
-                        />
+                        <Animated.View
+                          style={[
+                            styles.carousel3DCard,
+                            getCardTransform(index, scrollX),
+                          ]}
+                        >
+                          <OptimizedGalleryImage
+                            source={typeof img === 'string' ? { uri: img } : { uri: (img as any).uri || img }}
+                            style={styles.carousel3DImage}
+                            priority={priority}
+                          />
                         <View style={styles.carousel3DOverlay}>
                           <LinearGradient
                             colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -826,7 +850,8 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                         </View>
                       </Animated.View>
                     </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </Animated.ScrollView>
               </View>
             </Animated.View>
@@ -843,9 +868,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>
-                  {aboutUsMessage || `ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית. 
-                  
-✂️ AI: "המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!"`}
+                  {aboutUsMessage || `ברוכים הבאים למספרת אילון מתוק!
+
+אנחנו מספרה משפחתית בבאר שבע, מתמחים בתספורות גברים, תספורות ילדים וטיפוח אישי. 
+
+הצוות שלנו מנוסה ומקצועי, וכל לקוח מקבל יחס אישי ותשומת לב. אנחנו משתמשים במוצרים איכותיים ומקפידים על ניקיון והיגיינה.
+
+בואו להתרענן, להרגיש בבית ולצאת עם תספורת שתתאים לכם בדיוק.`}
                 </Text>
                 <TouchableOpacity
                   style={styles.wazeButton}
@@ -881,8 +910,31 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             </View>
           </Animated.View>
 
-          {/* Footer - without location / Waze */}
+          {/* Footer - with location */}
           <View style={styles.footerCard}>
+            {/* Location - opens in maps */}
+            <TouchableOpacity
+              style={styles.locationButton}
+              onPress={() => {
+                const address = 'אהרון קציר 10, באר שבע';
+                // iOS uses Apple Maps, Android uses Google Maps
+                const url = Platform.OS === 'ios'
+                  ? `maps://maps.apple.com/?address=${encodeURIComponent(address)}`
+                  : `geo:0,0?q=${encodeURIComponent(address)}`;
+
+                Linking.openURL(url).catch(() => {
+                  // Fallback to Google Maps web if native maps fail
+                  const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+                  Linking.openURL(webUrl).catch(() => {
+                    Alert.alert(t('common.error'), 'לא ניתן לפתוח מפות');
+                  });
+                });
+              }}
+            >
+              <Ionicons name="location" size={18} color="#007bff" />
+              <Text style={styles.locationText}>אהרון קציר 10, באר שבע</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => {
               const whatsappUrl = `https://wa.me/972523985505`;
               Linking.openURL(whatsappUrl).catch(() => {
@@ -910,35 +962,12 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
       <NotificationPanel
         visible={notificationPanelVisible}
-        onClose={() => setNotificationPanelVisible(false)}
+        onClose={() => {
+          setNotificationPanelVisible(false);
+          loadNotificationCount(); // Reload count when panel closes
+        }}
       />
       <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
-
-      {/* Admin Popup Message */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showPopup}
-        onRequestClose={() => setShowPopup(false)}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.popupContent}>
-            <View style={styles.popupHeader}>
-              <Text style={styles.popupTitle}>הודעה מהמספרה</Text>
-              <TouchableOpacity onPress={() => setShowPopup(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.popupMessage}>{popupMessage}</Text>
-            <TouchableOpacity
-              style={styles.popupButton}
-              onPress={() => setShowPopup(false)}
-            >
-              <Text style={styles.popupButtonText}>הבנתי</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Image Viewing Modal */}
       <Modal
@@ -1511,6 +1540,24 @@ const styles = StyleSheet.create({
     color: '#007bff',
     textDecorationLine: 'underline',
     marginTop: 4,
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '600',
+    marginLeft: 8,
   },
   popupOverlay: {
     flex: 1,

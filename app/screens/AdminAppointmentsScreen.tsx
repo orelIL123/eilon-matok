@@ -31,7 +31,7 @@ import {
 import ScissorsLoader from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
-import { isOnGrid, isValidDuration, SLOT_SIZE_MINUTES, slotFitsInDay, toYMD } from '../constants/scheduling';
+import { isOnGrid, isValidDuration, SLOT_SIZE_MINUTES, slotFitsInDay, timeStringToMinutes, toYMD } from '../constants/scheduling';
 
 interface AdminAppointmentsScreenProps {
   onNavigate: (screen: string) => void;
@@ -103,12 +103,30 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log('📅 Loading admin appointments data...');
+      
       const [appointmentsData, barbersData, usersData, treatmentsData] = await Promise.all([
         getCurrentMonthAppointments(), // Only load current month for better performance
         getBarbers(),
         getAllUsers(),
         getTreatments()
       ]);
+      
+      console.log(`✅ Loaded ${appointmentsData.length} appointments for current month`);
+      console.log(`✅ Loaded ${barbersData.length} barbers, ${usersData.length} users, ${treatmentsData.length} treatments`);
+      
+      // Log appointment details for debugging
+      if (appointmentsData.length > 0) {
+        console.log('📋 Sample appointments:', appointmentsData.slice(0, 3).map(apt => ({
+          id: apt.id,
+          date: apt.date?.toDate ? apt.date.toDate().toISOString() : apt.date,
+          status: apt.status,
+          barberId: apt.barberId,
+          userId: apt.userId
+        })));
+      } else {
+        console.warn('⚠️ No appointments found for current month!');
+      }
       
       // Auto-complete past appointments
       const now = new Date();
@@ -131,16 +149,46 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
         
         // Reload appointments after auto-completion
         const updatedAppointments = await getCurrentMonthAppointments();
+        console.log(`✅ Reloaded ${updatedAppointments.length} appointments after auto-completion`);
         setAppointments(updatedAppointments);
       } else {
         setAppointments(appointmentsData);
       }
       
+      // Log final appointments count and status breakdown
+      console.log(`📊 Final appointments loaded: ${appointmentsData.length} total`);
+      const statusBreakdown = appointmentsData.reduce((acc, apt) => {
+        acc[apt.status] = (acc[apt.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('📊 Status breakdown:', statusBreakdown);
+      
+      // Log appointments for today and tomorrow for debugging
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const todayAppointments = appointmentsData.filter(apt => {
+        const aptDate = apt.date.toMillis ? new Date(apt.date.toMillis()) : apt.date.toDate();
+        aptDate.setHours(0, 0, 0, 0);
+        return aptDate.getTime() === today.getTime();
+      });
+      
+      const tomorrowAppointments = appointmentsData.filter(apt => {
+        const aptDate = apt.date.toMillis ? new Date(apt.date.toMillis()) : apt.date.toDate();
+        aptDate.setHours(0, 0, 0, 0);
+        return aptDate.getTime() === tomorrow.getTime();
+      });
+      
+      console.log(`📅 Today (${today.toLocaleDateString('he-IL')}): ${todayAppointments.length} appointments`);
+      console.log(`📅 Tomorrow (${tomorrow.toLocaleDateString('he-IL')}): ${tomorrowAppointments.length} appointments`);
+      
       setBarbers(barbersData);
       setUsers(usersData);
       setTreatments(treatmentsData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading data:', error);
       showToast('שגיאה בטעינת הנתונים', 'error');
     } finally {
       setLoading(false);
@@ -241,14 +289,67 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
   };
 
   // Return available slots for the barber on selected date
+  // IMPORTANT: Show slots at intervals matching the treatment duration (like regular booking!)
+  // For 30-min treatment: 9:00, 9:30, 10:00...
+  // For 25-min treatment: 9:00, 9:25, 9:50...
+  // For 15-min treatment: 9:00, 9:15, 9:30...
   const generateTimeSlotsForAdmin = () => {
-    // If no barber or date selected, return empty
-    if (!selectedBarber || !selectedDate) {
+    // If no barber, date, or treatment selected, return empty
+    if (!selectedBarber || !selectedDate || !selectedTreatment) {
       return [];
     }
-    
-    // Return the actual available slots from the barber's availability
-    return availableSlots;
+
+    const selectedTreatmentObj = treatments.find(t => t.id === selectedTreatment);
+    if (!selectedTreatmentObj) {
+      return [];
+    }
+
+    const treatmentDuration = selectedTreatmentObj.duration;
+
+    // First, filter slots that can fit the treatment before midnight
+    const validSlots = availableSlots.filter(slot => {
+      const startMinutes = timeStringToMinutes(slot);
+      const endMinutes = startMinutes + treatmentDuration;
+      return endMinutes <= 24 * 60;
+    });
+
+    if (validSlots.length === 0) {
+      return [];
+    }
+
+    // Generate slot candidates at intervals matching the treatment duration
+    const slotCandidates: string[] = [];
+
+    // Find the earliest and latest available times
+    const sortedSlots = [...validSlots].sort((a, b) => timeStringToMinutes(a) - timeStringToMinutes(b));
+    const earliestMinutes = timeStringToMinutes(sortedSlots[0]);
+    const latestMinutes = timeStringToMinutes(sortedSlots[sortedSlots.length - 1]);
+
+    // Start from midnight and check every treatment-duration interval
+    // But only add slots where ALL required 5-minute slots are available
+    const startOfDay = 0;
+    const endOfDay = 24 * 60;
+
+    // Generate all possible start times based on treatment duration
+    for (let minutes = startOfDay; minutes <= latestMinutes && minutes < endOfDay; minutes += treatmentDuration) {
+      const timeString = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
+
+      // Check if this start time AND all slots during the treatment are available
+      let allSlotsAvailable = true;
+      for (let checkMinutes = minutes; checkMinutes < minutes + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
+        const checkTime = `${Math.floor(checkMinutes / 60).toString().padStart(2, '0')}:${(checkMinutes % 60).toString().padStart(2, '0')}`;
+        if (!availableSlots.includes(checkTime)) {
+          allSlotsAvailable = false;
+          break;
+        }
+      }
+
+      if (allSlotsAvailable) {
+        slotCandidates.push(timeString);
+      }
+    }
+
+    return slotCandidates;
   };
 
   // Check if a slot is occupied
@@ -270,7 +371,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
         if (appt.date && typeof appt.date.toDate === 'function') {
           apptStart = appt.date.toDate();
         } else if (appt.date) {
-          apptStart = new Date(appt.date);
+          apptStart = new Date(appt.date as any);
         } else {
           continue;
         }
@@ -848,11 +949,67 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                       styles.dateButtonText,
                       selectedDate.toDateString() === date.toDateString() && styles.selectedDateButtonText
                     ]}>
-                      {date.toLocaleDateString('he-IL', { 
-                        weekday: 'short', 
-                        day: 'numeric', 
-                        month: 'short' 
+                      {date.toLocaleDateString('he-IL', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short'
                       })}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Barber Selection */}
+              <Text style={styles.formLabel}>בחר ספר *</Text>
+              {barbers.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateIcon}>✂️</Text>
+                  <Text style={styles.emptyStateText}>
+                    אין ספרים במערכת. אנא הוסף ספרים דרך מסך ניהול הצוות.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={styles.selectionContainer}>
+                  {barbers.map((barber) => (
+                    <TouchableOpacity
+                      key={barber.id}
+                      style={[
+                        styles.selectionButton,
+                        selectedBarber === barber.id && styles.selectedSelectionButton
+                      ]}
+                      onPress={() => setSelectedBarber(barber.id)}
+                    >
+                      <Text style={[
+                        styles.selectionButtonText,
+                        selectedBarber === barber.id && styles.selectedSelectionButtonText
+                      ]}>
+                        {barber.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* Treatment Selection */}
+              <Text style={styles.formLabel}>בחר טיפול *</Text>
+              <ScrollView style={styles.selectionContainer}>
+                {treatments.map((treatment) => (
+                  <TouchableOpacity
+                    key={treatment.id}
+                    style={[
+                      styles.selectionButton,
+                      selectedTreatment === treatment.id && styles.selectedSelectionButton
+                    ]}
+                    onPress={() => setSelectedTreatment(treatment.id)}
+                  >
+                    <Text style={[
+                      styles.selectionButtonText,
+                      selectedTreatment === treatment.id && styles.selectedSelectionButtonText
+                    ]}>
+                      {treatment.name}
+                    </Text>
+                    <Text style={styles.selectionButtonSubtext}>
+                      ₪{treatment.price} • {treatment.duration} דקות
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -860,7 +1017,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
 
               {/* Time Selection */}
               <Text style={styles.formLabel}>
-                בחר שעה * 
+                בחר שעה *
                 {selectedTreatment && selectedBarber && availableSlots.length > 0 && (
                   <Text style={styles.formHint}> (אדום = תפוס, לבן = פנוי)</Text>
                 )}
@@ -871,6 +1028,12 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                     🔹 בחר תאריך וספר קודם כדי לראות שעות זמינות
                   </Text>
                 </View>
+              ) : !selectedTreatment ? (
+                <View style={styles.placeholderContainer}>
+                  <Text style={styles.placeholderText}>
+                    🔹 בחר טיפול קודם כדי לראות שעות זמינות
+                  </Text>
+                </View>
               ) : availableSlots.length === 0 ? (
                 <View style={styles.placeholderContainer}>
                   <Text style={styles.placeholderText}>
@@ -878,6 +1041,15 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                   </Text>
                   <Text style={styles.placeholderSubtext}>
                     יש להגדיר זמינות במסך "ניהול זמינות"
+                  </Text>
+                </View>
+              ) : generateTimeSlotsForAdmin().length === 0 ? (
+                <View style={styles.placeholderContainer}>
+                  <Text style={styles.placeholderText}>
+                    ⚠️ אין שעות פנויות לטיפול זה ביום זה
+                  </Text>
+                  <Text style={styles.placeholderSubtext}>
+                    נסה תאריך אחר או טיפול קצר יותר
                   </Text>
                 </View>
               ) : (
@@ -960,7 +1132,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                     onChangeText={setManualClientName}
                     textAlign="right"
                   />
-                  
+
                   <Text style={styles.subFormLabel}>מספר טלפון *</Text>
                   <TextInput
                     style={styles.textInput}
@@ -995,62 +1167,6 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                   ))}
                 </ScrollView>
               )}
-
-              {/* Barber Selection */}
-              <Text style={styles.formLabel}>בחר ספר *</Text>
-              {barbers.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateIcon}>✂️</Text>
-                  <Text style={styles.emptyStateText}>
-                    אין ספרים במערכת. אנא הוסף ספרים דרך מסך ניהול הצוות.
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView style={styles.selectionContainer}>
-                  {barbers.map((barber) => (
-                    <TouchableOpacity
-                      key={barber.id}
-                      style={[
-                        styles.selectionButton,
-                        selectedBarber === barber.id && styles.selectedSelectionButton
-                      ]}
-                      onPress={() => setSelectedBarber(barber.id)}
-                    >
-                      <Text style={[
-                        styles.selectionButtonText,
-                        selectedBarber === barber.id && styles.selectedSelectionButtonText
-                      ]}>
-                        {barber.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-
-              {/* Treatment Selection */}
-              <Text style={styles.formLabel}>בחר טיפול *</Text>
-              <ScrollView style={styles.selectionContainer}>
-                {treatments.map((treatment) => (
-                  <TouchableOpacity
-                    key={treatment.id}
-                    style={[
-                      styles.selectionButton,
-                      selectedTreatment === treatment.id && styles.selectedSelectionButton
-                    ]}
-                    onPress={() => setSelectedTreatment(treatment.id)}
-                  >
-                    <Text style={[
-                      styles.selectionButtonText,
-                      selectedTreatment === treatment.id && styles.selectedSelectionButtonText
-                    ]}>
-                      {treatment.name}
-                    </Text>
-                    <Text style={styles.selectionButtonSubtext}>
-                      ₪{treatment.price} • {treatment.duration} דקות
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
 
               {/* Notes */}
               <Text style={styles.formLabel}>הערות</Text>

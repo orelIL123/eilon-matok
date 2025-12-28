@@ -15,6 +15,7 @@ import {
 } from 'firebase/auth';
 import {
     addDoc,
+    arrayUnion,
     collection,
     deleteDoc,
     doc,
@@ -1382,9 +1383,24 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 
 export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
   try {
+    // #region agent log
+    if (updates.pushToken) {
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1384',message:'updateUserProfile called with pushToken',data:{uid,pushToken:updates.pushToken.substring(0,20)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+    // #endregion
     const docRef = doc(db, 'users', uid);
     await updateDoc(docRef, updates);
+    // #region agent log
+    if (updates.pushToken) {
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1387',message:'updateUserProfile completed',data:{uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+    // #endregion
   } catch (error) {
+    // #region agent log
+    if (updates.pushToken) {
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1389',message:'Error updating user profile',data:{uid,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+    // #endregion
     throw error;
   }
 };
@@ -1618,46 +1634,8 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       console.log('Failed to send appointment notification:', notificationError);
     }
     
-    // Send SMS confirmation to user
-    try {
-      const userProfile = await getUserProfile(appointmentData.userId);
-      if (userProfile && userProfile.phone) {
-        const dateVal: any = appointmentData.date as any;
-        const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
-        const dateStr = asDate.toLocaleDateString('he-IL');
-        const timeStr = asDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-        
-        // Get barber and treatment names
-        let barberName = 'הספר';
-        let treatmentName = 'הטיפול';
-        try {
-          if (appointmentData.barberId) {
-            const barber = await getBarber(appointmentData.barberId);
-            if (barber) barberName = barber.name;
-          }
-          if (appointmentData.treatmentId) {
-            const treatments = await getTreatments();
-            const treatment = treatments.find(t => t.id === appointmentData.treatmentId);
-            if (treatment) treatmentName = treatment.name;
-          }
-        } catch (e) {
-          console.log('Could not fetch barber/treatment details for SMS');
-        }
-        
-        // Create SMS message (keep it short for SMS4Free - max 70 chars)
-        const smsMessage = `תור אושר! 📅\n${dateStr} ${timeStr}\n${barberName} - ${treatmentName}\nאילון מתוק מספרה`;
-        const shortMessage = smsMessage.length > 70 ? smsMessage.substring(0, 67) + '...' : smsMessage;
-        
-        console.log('📱 Sending SMS confirmation to:', userProfile.phone);
-        await sendSMSReminder(userProfile.phone, shortMessage);
-        console.log('✅ SMS confirmation sent successfully');
-      } else {
-        console.log('⚠️ User has no phone number, skipping SMS confirmation');
-      }
-    } catch (smsError) {
-      console.error('❌ Failed to send SMS confirmation:', smsError);
-      // Don't throw - SMS failure shouldn't prevent appointment creation
-    }
+    // SMS confirmation removed - user requested not to send SMS on every appointment
+    // Only push notifications will be sent to avoid SMS quota issues
     
     // Send notification to admin about new appointment
     try {
@@ -1760,7 +1738,7 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       // Don't throw - WhatsApp failure shouldn't prevent appointment creation
     }
     
-    // Schedule LOCAL notification reminders ONLY (removed Firestore-based reminders to avoid duplicates)
+    // Schedule LOCAL notification reminders (for appointments within 24 hours)
     try {
       console.log('📱 Scheduling LOCAL appointment reminders...');
       const appointmentDate = appointmentData.date.toDate();
@@ -1771,6 +1749,16 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       console.log('✅ LOCAL appointment reminders scheduled successfully');
     } catch (localScheduleError) {
       console.log('❌ Failed to schedule LOCAL appointment reminders:', localScheduleError);
+    }
+
+    // Schedule Firestore-based reminders (for appointments more than 24 hours away)
+    // These will be processed by Cloud Functions even when app is closed
+    try {
+      console.log('📱 Scheduling Firestore-based appointment reminders...');
+      await scheduleAppointmentReminders(docRef.id, appointmentData);
+      console.log('✅ Firestore-based appointment reminders scheduled successfully');
+    } catch (firestoreScheduleError) {
+      console.log('❌ Failed to schedule Firestore-based appointment reminders:', firestoreScheduleError);
     }
 
     return docRef.id;
@@ -1826,6 +1814,8 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
 
         let notificationTitle = 'התור שלך עודכן! 📅';
         let notificationBody = 'התור שלך עודכן בהצלחה.';
+        // By default notify the customer; can be disabled per status below
+        let shouldNotifyUser = true;
 
         if (updates.status) {
           switch (updates.status) {
@@ -1838,50 +1828,14 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
               } catch (adminNotificationError) {
                 console.log('Failed to send appointment confirmation to admin:', adminNotificationError);
               }
-              // Send SMS confirmation to user
-              try {
-                const userProfile = await getUserProfile(appointmentData.userId);
-                if (userProfile && userProfile.phone) {
-                  const dateVal: any = appointmentData.date as any;
-                  const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
-                  const dateStr = asDate.toLocaleDateString('he-IL');
-                  const timeStr = asDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-                  
-                  // Get barber and treatment names
-                  let barberName = 'הספר';
-                  let treatmentName = 'הטיפול';
-                  try {
-                    if (appointmentData.barberId) {
-                      const barber = await getBarber(appointmentData.barberId);
-                      if (barber) barberName = barber.name;
-                    }
-                    if (appointmentData.treatmentId) {
-                      const treatments = await getTreatments();
-                      const treatment = treatments.find(t => t.id === appointmentData.treatmentId);
-                      if (treatment) treatmentName = treatment.name;
-                    }
-                  } catch (e) {
-                    console.log('Could not fetch barber/treatment details for SMS');
-                  }
-                  
-                  // Create SMS message (keep it short for SMS4Free - max 70 chars)
-                  const smsMessage = `תור אושר! ✅\n${dateStr} ${timeStr}\n${barberName} - ${treatmentName}\nאילון מתוק מספרה`;
-                  const shortMessage = smsMessage.length > 70 ? smsMessage.substring(0, 67) + '...' : smsMessage;
-                  
-                  console.log('📱 Sending SMS confirmation to:', userProfile.phone);
-                  await sendSMSReminder(userProfile.phone, shortMessage);
-                  console.log('✅ SMS confirmation sent successfully');
-                } else {
-                  console.log('⚠️ User has no phone number, skipping SMS confirmation');
-                }
-              } catch (smsError) {
-                console.error('❌ Failed to send SMS confirmation:', smsError);
-                // Don't throw - SMS failure shouldn't prevent appointment update
-              }
+              // SMS confirmation removed - user requested not to send SMS on every appointment
+              // Only push notifications will be sent to avoid SMS quota issues
               break;
             case 'completed':
               notificationTitle = 'התור הושלם! 🎉';
               notificationBody = 'התור שלך הושלם בהצלחה.';
+              // Do not notify customers when marking as completed (manual or automatic)
+              shouldNotifyUser = false;
               // Send notification to admin about appointment completion
               try {
                 await sendAppointmentCompletionToAdmin(appointmentId);
@@ -1922,12 +1876,16 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
           }
         }
 
-        await sendNotificationToUser(
-          appointmentData.userId,
-          notificationTitle,
-          notificationBody,
-          { appointmentId: appointmentId }
-        );
+        if (shouldNotifyUser) {
+          await sendNotificationToUser(
+            appointmentData.userId,
+            notificationTitle,
+            notificationBody,
+            { appointmentId: appointmentId }
+          );
+        } else {
+          console.log('🔕 Skipping user notification for completed appointment');
+        }
       }
     } catch (notificationError) {
       console.log('Failed to send appointment update notification:', notificationError);
@@ -1938,16 +1896,41 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
 };
 
 // Cancel appointment for user (changes status to cancelled)
-export const cancelAppointment = async (appointmentId: string) => {
+export const cancelAppointment = async (appointmentId: string, bypassDeadlineCheck: boolean = false) => {
   try {
     // Get appointment data before updating
     const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
     if (!appointmentDoc.exists()) {
       throw new Error('התור לא נמצא');
     }
-    
+
     const appointmentData = appointmentDoc.data() as Appointment;
-    
+
+    // Check cancellation deadline (unless admin is bypassing)
+    if (!bypassDeadlineCheck) {
+      const currentUser = getCurrentUser();
+      const isUserAdmin = currentUser ? await checkIsAdmin(currentUser.uid) : false;
+
+      // Only enforce deadline for non-admin users
+      if (!isUserAdmin) {
+        const settings = await getAdminNotificationSettings();
+        const deadlineHours = settings.cancellationDeadlineHours || 2;
+
+        const appointmentDate = appointmentData.date.toDate();
+        const now = new Date();
+        const hoursUntilAppointment = (appointmentDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        console.log(`🔍 Checking cancellation deadline: ${hoursUntilAppointment.toFixed(2)} hours until appointment, deadline: ${deadlineHours} hours`);
+
+        if (hoursUntilAppointment < deadlineHours) {
+          throw new Error(
+            `לא ניתן לבטל תור פחות מ-${deadlineHours} שעות לפני מועד התור.\n` +
+            `אנא פנה לספר לטיפול בביטול.`
+          );
+        }
+      }
+    }
+
     // Update appointment status to cancelled
     await updateDoc(doc(db, 'appointments', appointmentId), {
       status: 'cancelled',
@@ -2057,6 +2040,12 @@ export const deleteAppointment = async (appointmentId: string) => {
 // Admin functions
 export const checkIsAdmin = async (uid: string): Promise<boolean> => {
   try {
+    // Validate uid parameter
+    if (!uid || typeof uid !== 'string') {
+      console.error('Error checking admin status: Invalid uid', uid);
+      return false;
+    }
+
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (userDoc.exists()) {
       const userData = userDoc.data() as UserProfile;
@@ -2180,7 +2169,68 @@ export const getAppointmentsByDateRange = async (startDate: Date, endDate: Date)
     });
     
     return appointments;
-  } catch (error) {
+  } catch (error: any) {
+    // If error is due to missing index, fallback to loading all and filtering client-side
+    if (error?.code === 'failed-precondition' && error?.message?.includes('index')) {
+      console.warn('⚠️ Index not found for appointments query, falling back to client-side filtering');
+      console.warn('Create the index at:', error.message.match(/https:\/\/[^\s]+/)?.[0] || 'Firebase Console');
+      
+      // Fallback: Load all appointments and filter client-side
+      try {
+        console.log('🔄 Using fallback: Loading all appointments and filtering client-side');
+        const allAppointments = await getAllAppointments();
+        console.log(`📋 Loaded ${allAppointments.length} total appointments from database`);
+        
+        const startTimestamp = startDate.getTime();
+        const endTimestamp = endDate.getTime();
+        
+        console.log('🔍 Filtering appointments:', {
+          startTimestamp: new Date(startTimestamp).toISOString(),
+          endTimestamp: new Date(endTimestamp).toISOString(),
+          totalAppointments: allAppointments.length
+        });
+        
+        const filteredAppointments = allAppointments.filter(apt => {
+          if (!apt.date) {
+            console.warn('⚠️ Appointment without date:', apt.id);
+            return false;
+          }
+          const aptTime = apt.date.toMillis ? apt.date.toMillis() : apt.date.toDate().getTime();
+          const aptDate = new Date(aptTime);
+          const inRange = aptTime >= startTimestamp && aptTime <= endTimestamp;
+          
+          if (!inRange) {
+            console.log(`⏭️ Appointment ${apt.id} outside range: ${aptDate.toISOString()} (status: ${apt.status})`);
+          }
+          
+          return inRange;
+        });
+        
+        console.log(`✅ Filtered to ${filteredAppointments.length} appointments in date range`);
+        
+        // Sort by date descending
+        filteredAppointments.sort((a, b) => {
+          const aTime = a.date.toMillis ? a.date.toMillis() : a.date.toDate().getTime();
+          const bTime = b.date.toMillis ? b.date.toMillis() : b.date.toDate().getTime();
+          return bTime - aTime;
+        });
+        
+        // Log sample appointments for debugging
+        if (filteredAppointments.length > 0) {
+          console.log('📋 Sample filtered appointments:', filteredAppointments.slice(0, 3).map(apt => ({
+            id: apt.id,
+            date: apt.date.toMillis ? new Date(apt.date.toMillis()).toISOString() : apt.date.toDate().toISOString(),
+            status: apt.status
+          })));
+        }
+        
+        return filteredAppointments;
+      } catch (fallbackError) {
+        console.error('Error in fallback query:', fallbackError);
+        throw fallbackError;
+      }
+    }
+    
     console.error('Error getting appointments by date range:', error);
     throw error;
   }
@@ -2188,10 +2238,24 @@ export const getAppointmentsByDateRange = async (startDate: Date, endDate: Date)
 
 export const getCurrentMonthAppointments = async (): Promise<Appointment[]> => {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  
-  return getAppointmentsByDateRange(startOfMonth, endOfMonth);
+  // Start from 7 days ago to include recent past appointments
+  const startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+  // Include next 60 days to ensure all upcoming appointments are visible
+  const endDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
+
+  console.log('📅 getCurrentMonthAppointments - Date range:', {
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+    now: now.toISOString(),
+    daysInPast: 7,
+    daysInFuture: 60
+  });
+
+  const appointments = await getAppointmentsByDateRange(startDate, endDate);
+
+  console.log(`✅ getCurrentMonthAppointments - Found ${appointments.length} appointments in range`);
+
+  return appointments;
 };
 
 export const getRecentAppointments = async (days: number = 30): Promise<Appointment[]> => {
@@ -2442,6 +2506,7 @@ export const uploadImageToStorage = async (
 
     const user = auth.currentUser;
     if (!user) {
+      console.error('❌ NO USER AUTHENTICATED!');
       throw new Error('User must be authenticated to upload images');
     }
 
@@ -2451,101 +2516,85 @@ export const uploadImageToStorage = async (
     console.log('👤 Current user UID:', user.uid);
     console.log('👤 Current user email:', user.email);
     console.log('👤 Current user phone:', user.phoneNumber || 'N/A');
+    console.log('👤 User metadata:', {
+      creationTime: user.metadata.creationTime,
+      lastSignInTime: user.metadata.lastSignInTime
+    });
     
-    // Verify admin status before upload - CRITICAL CHECK
-    let userProfile;
-    try {
-      userProfile = await getUserProfile(user.uid);
-      console.log('👨‍💼 User profile from Firestore:', {
-        isAdmin: userProfile?.isAdmin || false,
-        isBarber: userProfile?.isBarber || false,
-        displayName: userProfile?.displayName || 'N/A',
-        email: userProfile?.email || 'N/A',
-        phone: userProfile?.phone || 'N/A',
-        uid: user.uid
-      });
-      
-      if (!userProfile) {
-        console.error('❌ User profile is NULL!');
-        throw new Error('פרופיל משתמש לא נמצא במערכת');
-      }
-      
-      if (!userProfile.isAdmin) {
-        console.error('❌ User is NOT admin in Firestore!');
-        console.error('   Expected UID: 6XVviL49bMdNtCsQ1JuXRnD1qao1 (Eilon)');
-        console.error('   Actual UID:', user.uid);
-        console.error('   Email:', user.email);
-        console.error('   isAdmin value:', userProfile.isAdmin);
-        throw new Error('אין הרשאות מנהל. אנא וודא שאתה מחובר כמנהל עם המספר 0508315002');
-      }
-      console.log('✅ Admin status verified in Firestore - user IS admin');
-    } catch (profileError) {
-      console.error('❌ Could not verify admin status:', profileError);
-      if (profileError instanceof Error && (profileError.message.includes('אין הרשאות') || profileError.message.includes('לא נמצא'))) {
-        throw profileError;
-      }
-      throw new Error('שגיאה בבדיקת הרשאות מנהל: ' + (profileError instanceof Error ? profileError.message : 'Unknown error'));
-    }
+    // IMPORTANT: Log the UID to check if it matches known admin UIDs
+    console.log('🔍 Checking UID against known admins:');
+    console.log('   Known admin UID 1: 6XVviL49bMdNtCsQ1JuXRnD1qao1');
+    console.log('   Known admin UID 2: PtpfrLNelaS2SB7ggzdLQuSN0V02');
+    console.log('   Current user UID:  ', user.uid);
+    console.log('   Match UID 1:       ', user.uid === '6XVviL49bMdNtCsQ1JuXRnD1qao1');
+    console.log('   Match UID 2:       ', user.uid === 'PtpfrLNelaS2SB7ggzdLQuSN0V02');
     
-    // Get fresh token to ensure authentication (this helps storage rules read Firestore)
-    try {
-      const token = await user.getIdToken(true); // Force refresh to get latest claims
-      console.log('🔑 User token refreshed successfully');
-      console.log('🔑 Token exists:', !!token);
-      
-      // Decode token to check claims (for debugging)
+    // Admin check with retry - sometimes profile needs time to load
+    let userProfile: UserProfile | null = null;
+    let adminCheckPassed = false;
+    
+    // Try to get user profile with retry (up to 2 attempts, faster)
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const decodedToken = await user.getIdTokenResult();
-        console.log('🔑 Token claims:', {
-          admin: decodedToken.claims.admin || false,
-          barber: decodedToken.claims.barber || false,
-          email: decodedToken.claims.email || 'N/A'
+        console.log(`🔍 Admin check attempt ${attempt}/2 for UID: ${user.uid}`);
+        userProfile = await getUserProfile(user.uid);
+        
+        console.log('👤 User profile loaded:', {
+          exists: !!userProfile,
+          displayName: userProfile?.displayName,
+          isAdmin: userProfile?.isAdmin,
+          email: userProfile?.email
         });
-      } catch (decodeError) {
-        console.warn('⚠️ Could not decode token claims:', decodeError);
+        
+        if (userProfile?.isAdmin) {
+          adminCheckPassed = true;
+          console.log('✅ Admin verified');
+          break;
+        } else if (userProfile) {
+          console.warn(`⚠️ User is not admin (attempt ${attempt}/2)`);
+          console.warn(`⚠️ User profile data:`, JSON.stringify(userProfile, null, 2));
+          if (attempt === 2) {
+            // Let storage rules handle it - they have fallback for known admins
+            console.warn('⚠️ Admin check failed, proceeding - storage rules will verify');
+          }
+        } else {
+          console.warn(`⚠️ User profile not found (attempt ${attempt}/2)`);
+        }
+      } catch (profileError) {
+        console.error(`❌ Error getting user profile (attempt ${attempt}/2):`, profileError);
+        if (attempt === 2) {
+          console.warn('⚠️ Admin check failed, proceeding - storage rules will verify');
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
       }
-    } catch (tokenError) {
-      console.error('❌ Error getting token:', tokenError);
-      throw new Error('שגיאה באימות המשתמש');
     }
-    
-    // Double-check: Log the exact UID we're using
-    console.log('🔍 Final verification before upload:');
-    console.log('   User UID:', user.uid);
-    console.log('   Expected UID for Eilon: 6XVviL49bMdNtCsQ1JuXRnD1qao1');
-    console.log('   UIDs match:', user.uid === '6XVviL49bMdNtCsQ1JuXRnD1qao1');
-    console.log('   User isAdmin (from profile):', userProfile?.isAdmin);
     
     // Create reference
     const imageRef = ref(storage, `${folderPath}/${fileName}`);
     console.log('📍 Storage reference created:', imageRef.fullPath);
     
-    // For React Native, we need to convert the URI to a blob using XMLHttpRequest
-    // This is more stable than fetch() in React Native
-    console.log('🔄 Converting image URI to blob...');
+    // Convert image URI to blob - optimized for React Native
+    console.log('🔄 Converting image to blob...');
     
     const blob = await new Promise<Blob>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.onload = function() {
-        try {
-          console.log('✅ Image loaded, creating blob...');
+      xhr.onload = () => {
+        if (xhr.status === 200 || xhr.status === 0) {
           resolve(xhr.response);
-        } catch (error) {
-          console.error('❌ Error creating blob:', error);
-          reject(error);
+        } else {
+          reject(new Error(`Failed to load image: ${xhr.status}`));
         }
       };
-      xhr.onerror = function(e) {
-        console.error('❌ XHR error:', e);
-        reject(new Error('Failed to load image'));
-      };
+      xhr.onerror = () => reject(new Error('Failed to load image'));
+      xhr.ontimeout = () => reject(new Error('Image load timeout'));
       xhr.responseType = 'blob';
-      console.log('📡 Starting XHR request...');
+      xhr.timeout = 30000; // 30 second timeout
       xhr.open('GET', imageUri, true);
       xhr.send(null);
     });
     
-    console.log('✅ Blob created, uploading to Firebase Storage...');
+    console.log('✅ Blob ready, uploading...');
     
     // Determine content type from mimeType or file extension
     let contentType = 'image/jpeg'; // default
@@ -2560,6 +2609,45 @@ export const uploadImageToStorage = async (
     }
     
     console.log('📄 Content type:', contentType);
+    
+    // Final verification - make sure user document exists in Firestore
+    // This is important for Storage Rules to work correctly
+    if (!adminCheckPassed) {
+      console.log('🔍 Final verification - checking Firestore document...');
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        console.log('📄 Firestore document check:', {
+          exists: userDocSnap.exists(),
+          uid: user.uid
+        });
+        
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          console.log('📄 User document data:', {
+            isAdmin: userData?.isAdmin,
+            isBarber: userData?.isBarber,
+            displayName: userData?.displayName,
+            email: userData?.email
+          });
+          
+          if (userData?.isAdmin) {
+            console.log('✅ User document verified in Firestore, isAdmin:', userData.isAdmin);
+            adminCheckPassed = true;
+          } else {
+            console.warn('⚠️ User document exists but isAdmin is false or missing');
+            console.warn('⚠️ Full user data:', JSON.stringify(userData, null, 2));
+          }
+        } else {
+          console.error('❌ User document does NOT exist in Firestore!');
+          console.error('❌ This is the problem - user needs to be created/updated in Firestore');
+        }
+      } catch (verifyError) {
+        console.error('❌ Final verification error:', verifyError);
+        console.warn('⚠️ Final verification failed, proceeding - storage rules will handle it');
+      }
+    }
     
     // Set content type metadata for the upload
     const metadata: UploadMetadata = {
@@ -2579,17 +2667,15 @@ export const uploadImageToStorage = async (
     console.error('❌ Error details:', {
       message: error?.message || 'Unknown error',
       code: error?.code,
+      serverResponse: error?.serverResponse,
       stack: error?.stack
     });
     
-    // Check for permission errors
-    if (error?.code === 'storage/unauthorized' || error?.code === 'permission-denied') {
-      console.error('🔒 PERMISSION DENIED - User may not be admin or document may not exist in Firestore');
-      throw new Error('אין הרשאה להעלות תמונות. אנא וודא שאתה מחובר כמנהל.');
-    }
-    
-    const errorMessage = error?.message || 'Unknown error';
-    throw new Error(`Failed to upload image: ${errorMessage}`);
+    // Build a detailed error message so the UI can display the real reason
+    const errorCode = error?.code || 'no-code';
+    const errorMessage = error?.message || String(error);
+    console.error('❌ Upload error (raw):', error);
+    throw new Error(`UPLOAD FAILED | code: ${errorCode} | msg: ${errorMessage}`);
   }
 };
 
@@ -3130,57 +3216,17 @@ export const initializeGalleryImages = async () => {
     // Check if gallery already has images
     const existingImages = await getGalleryImages();
     
-    // If we have placeholder images, replace them
-    const hasPlaceholders = existingImages.some(img => 
-      img.imageUrl && (img.imageUrl.includes('placeholder') || img.imageUrl.includes('via.placeholder'))
-    );
-    
-    if (hasPlaceholders) {
-      console.log('🔄 Found placeholder images, replacing with real images...');
-      await replaceGalleryPlaceholders();
-      return;
-    }
+    // REMOVED: Automatic placeholder replacement - users should manage their own images
+    // If you want to initialize gallery, do it manually from admin panel
     
     if (existingImages.length > 0) {
-      console.log('Gallery already has real images, skipping initialization');
+      console.log('Gallery already has images, skipping automatic initialization');
       return;
     }
 
-    console.log('Initializing gallery with default images...');
-    
-    // Add some real gallery images
-    const defaultGalleryImages = [
-      {
-        imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format',
-        type: 'gallery' as const,
-        order: 0,
-        isActive: true
-      },
-      {
-        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format',
-        type: 'gallery' as const,
-        order: 1,
-        isActive: true
-      },
-      {
-        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=300&fit=crop&auto=format',
-        type: 'gallery' as const,
-        order: 2,
-        isActive: true
-      },
-      {
-        imageUrl: 'https://images.unsplash.com/photo-1559599101-f09722fb4948?w=400&h=300&fit=crop&auto=format',
-        type: 'gallery' as const,
-        order: 3,
-        isActive: true
-      }
-    ];
-
-    for (const imageData of defaultGalleryImages) {
-      await addGalleryImage(imageData);
-    }
-    
-    console.log('✅ Gallery initialized with', defaultGalleryImages.length, 'images');
+    // REMOVED: Automatic default images - users should upload their own images
+    // Gallery will remain empty until user adds images manually
+    console.log('Gallery is empty - user should add images manually from admin panel');
   } catch (error) {
     console.error('❌ Error initializing gallery images:', error);
     // Don't throw - just log the error so app continues
@@ -3190,8 +3236,7 @@ export const initializeGalleryImages = async () => {
 // Initialize empty collections (run once)
 export const initializeCollections = async () => {
   try {
-    // Initialize gallery images
-    await initializeGalleryImages();
+    // REMOVED: Automatic gallery initialization - users should manage their own images
     
     // Create availability collection sample
     await addDoc(collection(db, 'availability'), {
@@ -3675,29 +3720,53 @@ export const replaceAppGalleryImage = async (oldImageUrl: string, newImageUri: s
 // Permissions should be requested explicitly by user action (e.g., button press)
 export const registerForPushNotifications = async (userId: string) => {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3613',message:'registerForPushNotifications called',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     // Check if device supports notifications
     if (!Device.isDevice) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3617',message:'Not a physical device',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.log('📱 Not a physical device, skipping push notification registration');
       return null;
     }
 
     // Check existing permissions (don't request)
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3622',message:'Permission status checked',data:{userId,status:existingStatus},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     if (existingStatus !== 'granted') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3624',message:'Permissions not granted',data:{userId,status:existingStatus},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.log('❌ Push notification permissions not granted - user must enable notifications first');
       return null;
     }
 
-    // Get push token
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    // Get push token with projectId
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '518e7344-df67-42cd-8107-502bd3e48357',
+    });
+    const token = tokenData.data;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3630',message:'Push token obtained',data:{userId,token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     console.log('📱 Push token:', token);
 
     // Save token to user profile
     await updateUserProfile(userId, { pushToken: token });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3634',message:'Push token saved to profile',data:{userId,token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     return token;
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3638',message:'Error in registerForPushNotifications',data:{userId,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     console.error('Error registering for push notifications:', error);
     return null;
   }
@@ -3705,6 +3774,9 @@ export const registerForPushNotifications = async (userId: string) => {
 
 export const sendPushNotification = async (pushToken: string, title: string, body: string, data?: any) => {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3643',message:'sendPushNotification called',data:{pushToken:pushToken.substring(0,20)+'...',title,body},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     const message = {
       to: pushToken,
       sound: 'default',
@@ -3713,7 +3785,7 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       data: data || {},
     };
 
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -3722,9 +3794,16 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       },
       body: JSON.stringify(message),
     });
+    // #region agent log
+    const responseData = await response.json();
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3661',message:'Push notification API response',data:{status:response.status,response:responseData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     console.log('✅ Push notification sent successfully');
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3665',message:'Error sending push notification',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     console.error('Error sending push notification:', error);
     throw error;
   }
@@ -3787,24 +3866,69 @@ export const sendSMSReminder = async (phoneNumber: string, message: string) => {
   }
 };
 
-export const sendNotificationToAllUsers = async (title: string, body: string, data?: any) => {
+export const sendNotificationToAllUsers = async (title: string, body: string, data?: any, includesSMS: boolean = false) => {
   try {
     const users = await getAllUsers();
     // Filter out admin users to avoid sending to admins
-    const nonAdminUsers = users.filter(user => !user.isAdmin && user.pushToken);
+    const nonAdminUsers = users.filter(user => !user.isAdmin);
     
     console.log(`📱 Sending notification to ${nonAdminUsers.length} non-admin users`);
-    
-    const results = await Promise.allSettled(
-      nonAdminUsers.map(user => 
+
+    // Create in-app notifications in Firestore for ALL users (even without push tokens)
+    const notificationsRef = collection(db, 'notifications');
+    const notificationPromises = nonAdminUsers.map(user =>
+      addDoc(notificationsRef, {
+        userId: user.uid,
+        type: 'general',
+        title,
+        message: body,
+        isRead: false,
+        createdAt: serverTimestamp()
+      })
+    );
+
+    await Promise.allSettled(notificationPromises);
+    console.log(`✅ Created ${nonAdminUsers.length} in-app notifications`);
+
+    // Send push notifications only to users with push tokens
+    const usersWithTokens = nonAdminUsers.filter(user => user.pushToken);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3752',message:'Users with push tokens found',data:{totalUsers:nonAdminUsers.length,usersWithTokens:usersWithTokens.length,userIds:usersWithTokens.map(u=>u.uid)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    const pushResults = await Promise.allSettled(
+      usersWithTokens.map(user =>
         sendPushNotification(user.pushToken!, title, body, data)
       )
     );
-    
-    const successful = results.filter(result => result.status === 'fulfilled').length;
-    console.log(`✅ Successfully sent to ${successful}/${nonAdminUsers.length} users`);
-    
-    return successful;
+
+    const successfulPush = pushResults.filter(result => result.status === 'fulfilled').length;
+    const failedPush = pushResults.filter(result => result.status === 'rejected');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3759',message:'Push notification results',data:{successful:successfulPush,total:usersWithTokens.length,failed:failedPush.length,failedReasons:failedPush.map(f=>f.status === 'rejected' ? (f.reason instanceof Error ? f.reason.message : String(f.reason)) : '')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    console.log(`✅ Successfully sent push notifications to ${successfulPush}/${usersWithTokens.length} users`);
+
+    // Save broadcast message to history
+    try {
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        const userProfile = await getUserProfile(currentUser.uid);
+        await saveBroadcastMessage({
+          title,
+          body,
+          sentBy: currentUser.uid,
+          sentByName: userProfile?.displayName || 'Admin',
+          recipientCount: nonAdminUsers.length, // Total users who received the notification
+          includesSMS,
+        });
+        console.log('✅ Broadcast message saved to history');
+      }
+    } catch (error) {
+      console.error('❌ Error saving broadcast message to history:', error);
+      // Don't fail the broadcast if history save fails
+    }
+
+    return nonAdminUsers.length; // Return total users who received the notification
   } catch (error) {
     console.error('Error sending notification to all users:', error);
     return 0;
@@ -4074,6 +4198,7 @@ export const getAdminNotificationSettings = async (): Promise<{
   newAppointmentBooked: boolean;
   appointmentCancelled: boolean;
   appointmentReminders: boolean;
+  cancellationDeadlineHours: number;
   reminderTimings: {
     oneHourBefore: boolean;
     tenMinutesBefore: boolean;
@@ -4103,6 +4228,7 @@ export const getAdminNotificationSettings = async (): Promise<{
         newAppointmentBooked: data.newAppointmentBooked ?? true,
         appointmentCancelled: data.appointmentCancelled ?? true,
         appointmentReminders: data.appointmentReminders ?? true,
+        cancellationDeadlineHours: data.cancellationDeadlineHours ?? 2,
         reminderTimings: {
           oneHourBefore: data.reminderTimings?.oneHourBefore ?? true,
           tenMinutesBefore: data.reminderTimings?.tenMinutesBefore ?? true,
@@ -4127,6 +4253,7 @@ export const getAdminNotificationSettings = async (): Promise<{
       newAppointmentBooked: true,
       appointmentCancelled: true,
       appointmentReminders: true,
+      cancellationDeadlineHours: 2,
       reminderTimings: {
         oneHourBefore: true,
         tenMinutesBefore: true,
@@ -4150,6 +4277,7 @@ export const getAdminNotificationSettings = async (): Promise<{
       newAppointmentBooked: true,
       appointmentCancelled: true,
       appointmentReminders: true,
+      cancellationDeadlineHours: 2,
       reminderTimings: {
         oneHourBefore: true,
         tenMinutesBefore: true,
@@ -4294,55 +4422,57 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
 
 // Process scheduled reminders (should be called periodically)
 // Clean up old appointments to reduce Firebase load
-export const cleanupOldAppointments = async (daysToKeep: number = 10): Promise<{
+// Only deletes completed/cancelled appointments older than specified days
+export const cleanupOldAppointments = async (daysToKeep: number = 30): Promise<{
   deletedCount: number;
   errorCount: number;
   errors: string[];
 }> => {
   try {
-    console.log(`🧹 Starting cleanup of appointments older than ${daysToKeep} days`);
+    console.log(`🧹 Starting cleanup of completed/cancelled appointments older than ${daysToKeep} days`);
     
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
     
-    // Get all appointments
-    const appointmentsRef = collection(db, 'appointments');
-    const snapshot = await getDocs(appointmentsRef);
+    // Use optimized query - only get recent appointments (last 60 days) to reduce data transfer
+    const recentAppointments = await getRecentAppointments(60);
     
     const appointmentsToDelete: string[] = [];
     const errors: string[] = [];
     let errorCount = 0;
     
-    snapshot.docs.forEach(doc => {
-      const appointmentData = doc.data();
-      const appointmentDate = appointmentData.date?.toDate();
+    recentAppointments.forEach(appointment => {
+      const appointmentDate = appointment.date?.toDate ? appointment.date.toDate() : null;
       
       if (appointmentDate && appointmentDate < cutoffDate) {
-        // Only delete if appointment is older than cutoff date
-        // AND if it's not a future appointment (safety check)
-        const now = new Date();
-        if (appointmentDate < now) {
-          appointmentsToDelete.push(doc.id);
+        // Only delete completed or cancelled appointments that are older than cutoff date
+        // Keep scheduled/confirmed appointments even if old (for records)
+        if ((appointment.status === 'completed' || appointment.status === 'cancelled') && appointmentDate < cutoffDate) {
+          appointmentsToDelete.push(appointment.id);
         }
       }
     });
     
-    console.log(`📋 Found ${appointmentsToDelete.length} old appointments to delete`);
+    console.log(`📋 Found ${appointmentsToDelete.length} old completed/cancelled appointments to delete`);
+    
+    if (appointmentsToDelete.length === 0) {
+      return { deletedCount: 0, errorCount: 0, errors: [] };
+    }
     
     // Delete appointments in batches to avoid overwhelming Firebase
-    const batchSize = 10;
+    const batchSize = 500; // Firestore batch limit
     let deletedCount = 0;
     
     for (let i = 0; i < appointmentsToDelete.length; i += batchSize) {
       const batch = appointmentsToDelete.slice(i, i + batchSize);
       
       try {
-        await Promise.all(
-          batch.map(appointmentId => 
-            deleteDoc(doc(db, 'appointments', appointmentId))
-          )
-        );
+        const writeBatchInstance = writeBatch(db);
+        batch.forEach(appointmentId => {
+          writeBatchInstance.delete(doc(db, 'appointments', appointmentId));
+        });
         
+        await writeBatchInstance.commit();
         deletedCount += batch.length;
         console.log(`✅ Deleted batch ${Math.floor(i / batchSize) + 1}: ${batch.length} appointments`);
         
@@ -4747,30 +4877,40 @@ export const getUserNotifications = async (userId: string): Promise<{
 }[]> => {
   try {
     const notificationsRef = collection(db, 'notifications');
+    // Only filter by userId - no orderBy to avoid index requirement
     const q = query(
       notificationsRef,
       where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(100) // Get more to sort client-side
     );
     
     const querySnapshot = await getDocs(q);
     const notifications = querySnapshot.docs.map(doc => {
       const data = doc.data();
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
       return {
         id: doc.id,
         type: data.type || 'general',
         title: data.title || 'הודעה',
         message: data.message || '',
-        time: data.createdAt?.toDate?.()?.toLocaleTimeString('he-IL', { 
+        time: createdAt ? createdAt.toLocaleTimeString('he-IL', { 
           hour: '2-digit', 
           minute: '2-digit' 
-        }) || 'עכשיו',
-        isRead: data.isRead || false
+        }) : 'עכשיו',
+        isRead: data.isRead || false,
+        createdAt: createdAt || new Date() // For sorting
       };
     });
     
-    return notifications;
+    // Sort by createdAt descending (newest first) on client side
+    notifications.sort((a, b) => {
+      const aTime = (a as any).createdAt?.getTime() || 0;
+      const bTime = (b as any).createdAt?.getTime() || 0;
+      return bTime - aTime;
+    });
+    
+    // Remove createdAt from return (not part of interface)
+    return notifications.slice(0, 50).map(({ createdAt, ...rest }) => rest);
   } catch (error) {
     console.error('Error getting user notifications:', error);
     return [];
@@ -4829,17 +4969,17 @@ export const createTestNotification = async (userId: string, type: 'appointment'
   }
 };
 
-// Delete old notifications (older than specified hours)
+// Delete old notifications (older than specified hours) for a specific user
 export const deleteOldNotifications = async (userId: string, hoursOld: number = 6): Promise<boolean> => {
   try {
     const notificationsRef = collection(db, 'notifications');
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - hoursOld);
     
+    // Only filter by userId - filter by date on client side to avoid index requirement
     const q = query(
       notificationsRef, 
-      where('userId', '==', userId),
-      where('createdAt', '<', cutoffTime)
+      where('userId', '==', userId)
     );
     
     const snapshot = await getDocs(q);
@@ -4848,17 +4988,129 @@ export const deleteOldNotifications = async (userId: string, hoursOld: number = 
       return true;
     }
     
+    // Filter old notifications on client side
+    const oldNotifications = snapshot.docs.filter(doc => {
+      const data = doc.data();
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+      if (!createdAt) return false; // Skip notifications without createdAt
+      return createdAt < cutoffTime;
+    });
+    
+    if (oldNotifications.length === 0) {
+      return true;
+    }
+    
     const batch = writeBatch(db);
-    snapshot.docs.forEach((doc) => {
+    oldNotifications.forEach((doc) => {
       batch.delete(doc.ref);
     });
     
     await batch.commit();
-    console.log(`Deleted ${snapshot.size} old notifications for user ${userId}`);
+    console.log(`✅ Deleted ${oldNotifications.length} old notifications for user ${userId}`);
     return true;
   } catch (error) {
     console.error('Error deleting old notifications:', error);
     return false;
+  }
+};
+
+// Clean up all old notifications older than specified hours (for all users)
+// This is more efficient for bulk cleanup
+export const cleanupOldNotifications = async (hoursOld: number = 48): Promise<{
+  deletedCount: number;
+  errorCount: number;
+  errors: string[];
+}> => {
+  try {
+    console.log(`🧹 Starting cleanup of notifications older than ${hoursOld} hours`);
+    
+    const notificationsRef = collection(db, 'notifications');
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - hoursOld);
+    const cutoffTimestamp = Timestamp.fromDate(cutoffTime);
+    
+    // Get all notifications - we'll filter by date on client side to avoid index requirement
+    // Limit to reasonable batch size to avoid memory issues
+    const snapshot = await getDocs(query(notificationsRef, limit(1000)));
+    
+    if (snapshot.empty) {
+      console.log('✅ No notifications to clean up');
+      return { deletedCount: 0, errorCount: 0, errors: [] };
+    }
+    
+    // Filter old notifications on client side
+    const oldNotifications = snapshot.docs.filter(doc => {
+      const data = doc.data();
+      const createdAt = data.createdAt;
+      if (!createdAt) return false; // Skip notifications without createdAt
+      
+      // Handle both Timestamp and Date objects
+      let createdAtDate: Date;
+      if (createdAt.toDate && typeof createdAt.toDate === 'function') {
+        createdAtDate = createdAt.toDate();
+      } else if (createdAt instanceof Timestamp) {
+        createdAtDate = createdAt.toDate();
+      } else if (createdAt instanceof Date) {
+        createdAtDate = createdAt;
+      } else {
+        return false; // Skip if we can't parse the date
+      }
+      
+      return createdAtDate < cutoffTime;
+    });
+    
+    if (oldNotifications.length === 0) {
+      console.log('✅ No old notifications found to delete');
+      return { deletedCount: 0, errorCount: 0, errors: [] };
+    }
+    
+    console.log(`📋 Found ${oldNotifications.length} old notifications to delete`);
+    
+    // Delete notifications in batches to avoid overwhelming Firebase
+    const batchSize = 500; // Firestore batch limit is 500
+    let deletedCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+    
+    for (let i = 0; i < oldNotifications.length; i += batchSize) {
+      const batch = oldNotifications.slice(i, i + batchSize);
+      
+      try {
+        const writeBatchInstance = writeBatch(db);
+        batch.forEach((doc) => {
+          writeBatchInstance.delete(doc.ref);
+        });
+        
+        await writeBatchInstance.commit();
+        deletedCount += batch.length;
+        console.log(`✅ Deleted batch ${Math.floor(i / batchSize) + 1}: ${batch.length} notifications`);
+        
+        // Small delay between batches to be gentle on Firebase
+        if (i + batchSize < oldNotifications.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (error) {
+        console.error(`❌ Error deleting batch ${Math.floor(i / batchSize) + 1}:`, error);
+        errorCount += batch.length;
+        errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error}`);
+      }
+    }
+    
+    console.log(`🧹 Cleanup completed: ${deletedCount} deleted, ${errorCount} errors`);
+    
+    return {
+      deletedCount,
+      errorCount,
+      errors
+    };
+    
+  } catch (error) {
+    console.error('Error during notification cleanup:', error);
+    return {
+      deletedCount: 0,
+      errorCount: 1,
+      errors: [`General error: ${error}`]
+    };
   }
 };
 
@@ -5088,5 +5340,111 @@ export const notifyWaitlistOnCancellation = async (barberId: string, appointment
     console.log('Finished notifying waitlist users');
   } catch (error) {
     console.error('Error notifying waitlist on cancellation:', error);
+  }
+};
+
+// ===== Broadcast Messages Management =====
+
+export interface BroadcastMessage {
+  id: string;
+  title: string;
+  body: string;
+  sentBy: string;
+  sentByName: string;
+  sentAt: Timestamp;
+  recipientCount: number;
+  includesSMS: boolean;
+  dismissedBy?: string[]; // Array of user IDs who dismissed this message
+}
+
+// Save a broadcast message to history
+export const saveBroadcastMessage = async (
+  messageData: Omit<BroadcastMessage, 'id' | 'sentAt'>
+): Promise<string> => {
+  try {
+    const messageRef = await addDoc(collection(db, 'broadcastMessages'), {
+      ...messageData,
+      sentAt: serverTimestamp(),
+    });
+    console.log('✅ Broadcast message saved with ID:', messageRef.id);
+    return messageRef.id;
+  } catch (error) {
+    console.error('❌ Error saving broadcast message:', error);
+    throw error;
+  }
+};
+
+// Get all broadcast messages (sorted by most recent first)
+export const getBroadcastMessages = async (): Promise<BroadcastMessage[]> => {
+  try {
+    const messagesQuery = query(
+      collection(db, 'broadcastMessages'),
+      orderBy('sentAt', 'desc'),
+      limit(50) // Limit to last 50 messages
+    );
+
+    const snapshot = await getDocs(messagesQuery);
+    const messages: BroadcastMessage[] = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as BroadcastMessage));
+
+    console.log(`✅ Retrieved ${messages.length} broadcast messages`);
+    return messages;
+  } catch (error) {
+    console.error('❌ Error getting broadcast messages:', error);
+    return [];
+  }
+};
+
+// Delete a broadcast message
+export const deleteBroadcastMessage = async (messageId: string): Promise<boolean> => {
+  try {
+    await deleteDoc(doc(db, 'broadcastMessages', messageId));
+    console.log('✅ Broadcast message deleted:', messageId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting broadcast message:', error);
+    return false;
+  }
+};
+
+// Dismiss a broadcast message for a specific user
+export const dismissBroadcastMessage = async (messageId: string, userId: string): Promise<boolean> => {
+  try {
+    const messageRef = doc(db, 'broadcastMessages', messageId);
+    await updateDoc(messageRef, {
+      dismissedBy: arrayUnion(userId)
+    });
+    console.log('✅ Broadcast message dismissed for user:', userId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error dismissing broadcast message:', error);
+    return false;
+  }
+};
+
+// Get active broadcast messages for a specific user (not dismissed)
+export const getActiveBroadcastMessages = async (userId: string): Promise<BroadcastMessage[]> => {
+  try {
+    const messagesQuery = query(
+      collection(db, 'broadcastMessages'),
+      orderBy('sentAt', 'desc'),
+      limit(50)
+    );
+
+    const snapshot = await getDocs(messagesQuery);
+    const messages: BroadcastMessage[] = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as BroadcastMessage))
+      .filter(msg => !msg.dismissedBy || !msg.dismissedBy.includes(userId)); // Filter out dismissed messages
+
+    console.log(`✅ Retrieved ${messages.length} active broadcast messages for user ${userId}`);
+    return messages;
+  } catch (error) {
+    console.error('❌ Error getting active broadcast messages:', error);
+    return [];
   }
 };

@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -20,9 +22,11 @@ import {
     getUserProfile,
     logoutUser,
     onAuthStateChange,
+    registerForPushNotifications,
     updateUserProfile,
     UserProfile
 } from '../../services/firebase';
+import { ensurePermissions } from '../../services/notifications';
 import ScissorsLoader from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -72,6 +76,41 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
         setDisplayName(profile?.displayName || '');
         setPhone(profile?.phone || '');
         setLoading(false);
+
+        // Request notification permissions on first login (only once per user)
+        const hasRequestedPermissions = await AsyncStorage.getItem(`notification_permission_requested_${currentUser.uid}`);
+        if (!hasRequestedPermissions) {
+          // Wait a bit for the screen to load
+          setTimeout(async () => {
+            try {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileScreen.tsx:86',message:'Requesting notification permissions',data:{userId:currentUser.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              console.log('📱 Requesting notification permissions for first time...');
+              const granted = await ensurePermissions();
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileScreen.tsx:87',message:'Permission request result',data:{userId:currentUser.uid,granted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              if (granted) {
+                // Register push token
+                const token = await registerForPushNotifications(currentUser.uid);
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileScreen.tsx:90',message:'registerForPushNotifications result',data:{userId:currentUser.uid,token:token ? token.substring(0,20)+'...' : null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
+                console.log('✅ Notification permissions granted and push token registered');
+              } else {
+                console.log('❌ Notification permissions denied');
+              }
+              // Mark as requested (even if denied, so we don't ask again)
+              await AsyncStorage.setItem(`notification_permission_requested_${currentUser.uid}`, 'true');
+            } catch (error) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileScreen.tsx:98',message:'Error requesting permissions',data:{userId:currentUser.uid,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              console.error('❌ Error requesting notification permissions:', error);
+            }
+          }, 2000); // Wait 2 seconds after login
+        }
       } else {
         // User is not authenticated - redirect to auth-choice screen
         setUserProfile(null);

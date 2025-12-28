@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import {
     checkIsAdmin,
+    cleanupOldAppointments,
+    cleanupOldNotifications,
     getAllAppointments,
     getBarbers,
     getRecentAppointments,
@@ -79,12 +81,40 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
     if (isAdmin) {
       loadStatistics();
       
+      // Clean up old notifications (48 hours) on screen load - run once in background
+      cleanupOldNotifications(48).catch(err => {
+        console.error('Error cleaning up old notifications:', err);
+      });
+      
+      // Clean up old completed/cancelled appointments (30 days) on screen load - run once in background
+      cleanupOldAppointments(30).catch(err => {
+        console.error('Error cleaning up old appointments:', err);
+      });
+      
       // Set up automatic appointment completion check
       const interval = setInterval(() => {
         checkAndCompleteAppointments();
       }, 60000); // Check every minute
       
-      return () => clearInterval(interval);
+      // Set up periodic notification cleanup (every 6 hours)
+      const cleanupInterval = setInterval(() => {
+        cleanupOldNotifications(48).catch(err => {
+          console.error('Error in periodic notification cleanup:', err);
+        });
+      }, 6 * 60 * 60 * 1000); // Every 6 hours
+      
+      // Set up periodic appointment cleanup (once per day)
+      const appointmentCleanupInterval = setInterval(() => {
+        cleanupOldAppointments(30).catch(err => {
+          console.error('Error in periodic appointment cleanup:', err);
+        });
+      }, 24 * 60 * 60 * 1000); // Every 24 hours
+      
+      return () => {
+        clearInterval(interval);
+        clearInterval(cleanupInterval);
+        clearInterval(appointmentCleanupInterval);
+      };
     }
   }, [isAdmin]);
 

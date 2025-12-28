@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateEmailAndSendReset = exports.deleteUserAuth = void 0;
-const functions = require("firebase-functions");
+exports.processScheduledReminders = exports.updateEmailAndSendReset = exports.deleteUserAuth = void 0;
 const admin = require("firebase-admin");
+const functions = require("firebase-functions");
 admin.initializeApp();
 exports.deleteUserAuth = functions.https.onCall(async (data, context) => {
     var _a, _b;
@@ -77,7 +77,7 @@ exports.updateEmailAndSendReset = functions.https.onCall(async (data) => {
         // This triggers Firebase to send a password reset email automatically
         // Using Firebase's default domain which is already allowlisted
         const actionCodeSettings = {
-            url: 'https://gal-shemesh.firebaseapp.com',
+            url: 'https://eilon-matok.firebaseapp.com',
             handleCodeInApp: false
         };
         // generatePasswordResetLink generates a link that Firebase will use
@@ -103,6 +103,156 @@ exports.updateEmailAndSendReset = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('invalid-argument', 'Invalid email address');
         }
         throw new functions.https.HttpsError('internal', `Failed: ${error.message}`);
+    }
+});
+// Process scheduled appointment reminders every 5 minutes
+// This ensures reminders are sent even when the app is closed
+exports.processScheduledReminders = functions.pubsub
+    .schedule('every 5 minutes')
+    .onRun(async (context) => {
+    try {
+        console.log('🕐 Processing scheduled reminders (Cloud Function)...');
+        const now = admin.firestore.Timestamp.now();
+        const remindersRef = admin.firestore().collection('scheduledReminders');
+        // Get all pending reminders that are due
+        const remindersSnapshot = await remindersRef
+            .where('status', '==', 'pending')
+            .where('scheduledTime', '<=', now)
+            .get();
+        console.log(`📱 Found ${remindersSnapshot.size} reminders to process`);
+        const results = await Promise.allSettled(remindersSnapshot.docs.map(async (reminderDoc) => {
+            var _a, _b;
+            const reminderData = reminderDoc.data();
+            const { appointmentId, userId, reminderType } = reminderData;
+            try {
+                // Get appointment data
+                const appointmentDoc = await admin.firestore()
+                    .collection('appointments')
+                    .doc(appointmentId)
+                    .get();
+                if (!appointmentDoc.exists) {
+                    console.log(`❌ Appointment ${appointmentId} not found, skipping reminder`);
+                    await reminderDoc.ref.update({ status: 'failed', error: 'Appointment not found' });
+                    return;
+                }
+                const appointmentData = appointmentDoc.data();
+                const appointmentDate = appointmentData.date.toDate();
+                const currentTime = new Date();
+                const timeDiff = appointmentDate.getTime() - currentTime.getTime();
+                const hoursUntilAppointment = timeDiff / (1000 * 60 * 60);
+                const minutesUntilAppointment = timeDiff / (1000 * 60);
+                // Get user's push token
+                const userDoc = await admin.firestore()
+                    .collection('users')
+                    .doc(userId)
+                    .get();
+                if (!userDoc.exists) {
+                    console.log(`❌ User ${userId} not found, skipping reminder`);
+                    await reminderDoc.ref.update({ status: 'failed', error: 'User not found' });
+                    return;
+                }
+                const userData = userDoc.data();
+                const pushToken = userData.pushToken;
+                if (!pushToken) {
+                    console.log(`⚠️ User ${userId} has no push token, skipping reminder`);
+                    await reminderDoc.ref.update({ status: 'failed', error: 'No push token' });
+                    return;
+                }
+                // Get treatment name
+                let treatmentName = 'הטיפול';
+                if (appointmentData.treatmentId) {
+                    try {
+                        const treatmentDoc = await admin.firestore()
+                            .collection('treatments')
+                            .doc(appointmentData.treatmentId)
+                            .get();
+                        if (treatmentDoc.exists) {
+                            treatmentName = treatmentDoc.data().name || 'הטיפול';
+                        }
+                    }
+                    catch (e) {
+                        console.log('Could not fetch treatment name');
+                    }
+                }
+                // Determine reminder message based on time until appointment
+                let title = '';
+                let message = '';
+                if (minutesUntilAppointment <= 15 && minutesUntilAppointment > 0 && hoursUntilAppointment < 1) {
+                    title = 'תזכורת לתור! ⏰';
+                    message = `התור שלך בעוד 15 דקות ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+                }
+                else if (hoursUntilAppointment <= 1 && minutesUntilAppointment > 15) {
+                    title = 'תזכורת לתור! ⏰';
+                    message = `יש לך תור ל${treatmentName} בעוד שעה ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+                }
+                else if (hoursUntilAppointment <= 24 && hoursUntilAppointment > 1) {
+                    const isTomorrow = appointmentDate.toDateString() === new Date(currentTime.getTime() + 24 * 60 * 60 * 1000).toDateString();
+                    title = 'תזכורת לתור! 📅';
+                    if (isTomorrow) {
+                        message = `התור שלך מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+                    }
+                    else {
+                        message = `התור שלך ב-${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+                    }
+                }
+                else if (minutesUntilAppointment <= 0 && minutesUntilAppointment > -60) {
+                    title = 'התור שלך מתחיל! 🎯';
+                    message = `התור שלך ל${treatmentName} מתחיל עכשיו!`;
+                }
+                else {
+                    console.log(`📅 No reminder needed at this time (${hoursUntilAppointment.toFixed(2)} hours until appointment)`);
+                    await reminderDoc.ref.update({ status: 'skipped', reason: 'Not the right time' });
+                    return;
+                }
+                // Send push notification using Expo's push notification service
+                const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Accept-encoding': 'gzip, deflate',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        to: pushToken,
+                        sound: 'default',
+                        title: title,
+                        body: message,
+                        data: { appointmentId: appointmentId, type: 'appointment-reminder' },
+                    }),
+                });
+                const responseData = await response.json();
+                if (response.ok && ((_a = responseData.data) === null || _a === void 0 ? void 0 : _a.status) === 'ok') {
+                    console.log(`✅ Sent ${reminderType} reminder to user ${userId} for appointment ${appointmentId}`);
+                    // Mark reminder as sent
+                    await reminderDoc.ref.update({
+                        status: 'sent',
+                        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                }
+                else {
+                    console.error(`❌ Failed to send reminder:`, responseData);
+                    await reminderDoc.ref.update({
+                        status: 'failed',
+                        error: ((_b = responseData.data) === null || _b === void 0 ? void 0 : _b.message) || 'Unknown error'
+                    });
+                }
+            }
+            catch (error) {
+                console.error(`❌ Error processing reminder ${reminderDoc.id}:`, error);
+                await reminderDoc.ref.update({
+                    status: 'failed',
+                    error: error.message || 'Unknown error'
+                });
+            }
+        }));
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        console.log(`✅ Processed ${successful} reminders successfully, ${failed} failed`);
+        return { success: true, processed: successful, failed };
+    }
+    catch (error) {
+        console.error('❌ Error in processScheduledReminders:', error);
+        throw error;
     }
 });
 //# sourceMappingURL=index.js.map

@@ -11,7 +11,6 @@ import { Alert, View } from 'react-native';
 import 'react-native-reanimated';
 import '../app/globals.css';
 import { auth } from '../config/firebase';
-import { processScheduledReminders } from '../services/firebase';
 import { ensureAndroidChannel } from '../services/notifications';
 import AppAuthGate from './components/AppAuthGate';
 import i18n from './i18n';
@@ -117,22 +116,41 @@ export default function RootLayout() {
     checkForUpdates();
   }, []);
 
-  // Process scheduled reminders every 5 minutes
+  // Process scheduled reminders every 5 minutes (only for admin users)
   useEffect(() => {
     const processReminders = async () => {
       try {
-        console.log('🕐 Processing scheduled reminders...');
+        // Check if user is admin before processing reminders
+        const { getCurrentUser, checkIsAdmin, processScheduledReminders } = await import('../services/firebase');
+        const currentUser = getCurrentUser();
+        
+        if (!currentUser) {
+          return; // Not logged in, skip
+        }
+        
+        const isAdmin = await checkIsAdmin();
+        if (!isAdmin) {
+          return; // Not admin, skip - Cloud Functions will handle this
+        }
+        
+        console.log('🕐 Processing scheduled reminders (admin)...');
         await processScheduledReminders();
         console.log('✅ Reminders processed successfully');
       } catch (error) {
-        console.error('❌ Error processing reminders:', error);
+        // Silently fail - this is expected for non-admin users
+        // Cloud Functions will handle reminders processing
+        if (error instanceof Error && error.message.includes('permission')) {
+          console.log('ℹ️ Reminders processing skipped (not admin - Cloud Functions will handle)');
+        } else {
+          console.error('❌ Error processing reminders:', error);
+        }
       }
     };
 
-    // Process reminders immediately when app starts
+    // Process reminders immediately when app starts (if admin)
     processReminders();
 
-    // Process reminders every 5 minutes
+    // Process reminders every 5 minutes (if admin)
     const interval = setInterval(processReminders, 5 * 60 * 1000);
 
     return () => clearInterval(interval);

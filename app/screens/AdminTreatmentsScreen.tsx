@@ -20,7 +20,6 @@ import {
     addTreatment,
     deleteTreatment,
     getTreatments,
-    updateTreatment,
     uploadImageToStorage
 } from '../../services/firebase';
 import ScissorsLoader from '../components/ScissorsLoader';
@@ -37,7 +36,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingTreatment, setEditingTreatment] = useState<Treatment | null>(null);
+  // Treatments cannot be edited - only added or deleted
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
   // Form states
@@ -91,7 +90,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.85, // High quality for best image appearance
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -169,7 +168,6 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
 
   const openAddModal = () => {
     console.log('🔧 Opening add treatment modal...');
-    setEditingTreatment(null);
     const initialFormData = {
       name: '',
       duration: '',
@@ -183,17 +181,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
     console.log('✅ Modal should be visible now');
   };
 
-  const openEditModal = (treatment: Treatment) => {
-    setEditingTreatment(treatment);
-    setFormData({
-      name: treatment.name,
-      duration: treatment.duration.toString(),
-      price: treatment.price.toString(),
-      description: treatment.description,
-      image: treatment.image
-    });
-    setModalVisible(true);
-  };
+  // Edit functionality removed - treatments can only be added or deleted
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -238,22 +226,12 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
 
       console.log('📊 Treatment data:', treatmentData);
 
-      if (editingTreatment) {
-        console.log('✏️ Updating existing treatment:', editingTreatment.id);
-        await updateTreatment(editingTreatment.id, treatmentData);
-        setTreatments(prev =>
-          prev.map(t =>
-            t.id === editingTreatment.id ? { ...t, ...treatmentData } : t
-          )
-        );
-        showToast('הטיפול עודכן בהצלחה');
-      } else {
-        console.log('➕ Adding new treatment...');
-        const newTreatmentId = await addTreatment(treatmentData);
-        console.log('✅ New treatment ID:', newTreatmentId);
-        setTreatments(prev => [...prev, { id: newTreatmentId, ...treatmentData }]);
-        showToast('הטיפול נוסף בהצלחה');
-      }
+      // Treatments can only be added, not edited
+      console.log('➕ Adding new treatment...');
+      const newTreatmentId = await addTreatment(treatmentData);
+      console.log('✅ New treatment ID:', newTreatmentId);
+      setTreatments(prev => [...prev, { id: newTreatmentId, ...treatmentData }]);
+      showToast('הטיפול נוסף בהצלחה');
 
       // Reload treatments to ensure we have fresh data
       await loadTreatments();
@@ -329,12 +307,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                   <View style={styles.treatmentHeader}>
                     <Text style={styles.treatmentName}>{treatment.name}</Text>
                     <View style={styles.treatmentActions}>
-                      <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => openEditModal(treatment)}
-                      >
-                        <Ionicons name="create" size={20} color="#007bff" />
-                      </TouchableOpacity>
+                      {/* Edit button removed - treatments cannot be edited, only deleted */}
                       <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => handleDelete(treatment.id, treatment.name)}
@@ -393,7 +366,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTreatment ? 'עריכת טיפול' : 'הוספת טיפול חדש'}
+                הוספת טיפול חדש
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#666" />

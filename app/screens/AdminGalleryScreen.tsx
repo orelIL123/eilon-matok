@@ -21,10 +21,8 @@ import {
   deleteGalleryImage,
   deleteShopItem,
   GalleryImage,
-  getAllStorageImages,
   getGalleryImages,
   getShopItems,
-  initializeGalleryImages,
   ShopItem,
   updateShopItem,
   uploadImageToStorage
@@ -44,23 +42,9 @@ interface AdminGalleryScreenProps {
 
 const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onBack, initialTab }) => {
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [storageImages, setStorageImages] = useState<{
-    gallery: string[];
-    backgrounds: string[];
-    splash: string[];
-    workers: string[];
-    aboutus: string[];
-    treatments: string[];
-  }>({
-    gallery: [],
-    backgrounds: [],
-    splash: [],
-    workers: [],
-    aboutus: [],
-    treatments: []
-  });
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null); // תצוגה מקדימה
   const [modalVisible, setModalVisible] = useState(false);
   const [shopModalVisible, setShopModalVisible] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'gallery' | 'background' | 'splash' | 'aboutus' | 'shop' | 'treatments'>(initialTab || 'gallery');
@@ -135,21 +119,10 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   const loadImages = async () => {
     try {
       setLoading(true);
-      let [imagesData, storageImagesData] = await Promise.all([
-        getGalleryImages(),
-        getAllStorageImages()
-      ]);
+      let imagesData = await getGalleryImages();
 
-      if (!imagesData || imagesData.length === 0) {
-        try {
-          console.log('📷 No gallery images found, initializing defaults from Firebase...');
-          await initializeGalleryImages();
-          imagesData = await getGalleryImages();
-        } catch (initError) {
-          console.error('Error initializing gallery images:', initError);
-          showToast('שגיאה בטעינת גלריה, נסה שוב מאוחר יותר', 'error');
-        }
-      }
+      // Gallery can be empty - users should add images manually
+      // No automatic initialization
 
       // Load atmosphere and aboutus images from settings and add them to gallery if they don't exist
       try {
@@ -217,7 +190,6 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       }
 
       setImages(imagesData);
-      setStorageImages(storageImagesData);
     } catch (error) {
       console.error('Error loading images:', error);
       showToast('שגיאה בטעינת התמונות', 'error');
@@ -235,7 +207,13 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   };
 
   const openAddModal = (type: 'gallery' | 'background' | 'splash' | 'aboutus' | 'treatments') => {
+    // Prevent adding/changing aboutus images
+    if (type === 'aboutus') {
+      showToast('לא ניתן לשנות את תמונת אודותינו', 'error');
+      return;
+    }
     setEditingImage(null);
+    setSelectedImageUri(null); // אפס תצוגה מקדימה
     setFormData({
       imageUrl: '',
       type,
@@ -256,36 +234,23 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
 
   const pickImageFromDevice = async (): Promise<{ uri: string; mimeType?: string } | null> => {
     try {
-      console.log('📱 Requesting media library permissions...');
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (permissionResult.granted === false) {
+
+      if (permissionResult.granted === false || permissionResult.status !== 'granted') {
         showToast('נדרשת הרשאה לגישה לגלריה', 'error');
         return null;
       }
 
-      // Double check permission status
-      if (permissionResult.status !== 'granted') {
-        showToast('הרשאת גישה נדחתה', 'error');
-        return null;
-      }
-
-      console.log('📱 Permissions granted, launching image picker...');
-      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 0.5, // Reduced quality to save space - especially for shop images
+        quality: 0.85, // High quality for best image appearance
       });
-
-      console.log('📱 Image picker result:', result);
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const imageUri = asset.uri;
         const mimeType = asset.mimeType || 'image/jpeg';
-        console.log('📤 Selected image URI:', imageUri);
-        console.log('📄 MIME type:', mimeType);
         return { uri: imageUri, mimeType };
       }
     } catch (error) {
@@ -295,55 +260,35 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     return null;
   };
 
-  const uploadImageFromDevice = async () => {
+  const selectImageFromDevice = async () => {
     try {
       const imageData = await pickImageFromDevice();
       if (!imageData) return;
 
-      showToast('מעלה תמונה...', 'success');
-      
-      // Determine file extension from mimeType
-      let extension = 'jpg';
-      if (imageData.mimeType?.includes('png')) {
-        extension = 'png';
-      } else if (imageData.mimeType?.includes('webp')) {
-        extension = 'webp';
-      }
-      
-      const fileName = `img_${Date.now()}.${extension}`;
-      const folderPath = formData.type === 'background' ? 'backgrounds' : formData.type;
-      
-      const downloadURL = await uploadImageToStorage(imageData.uri, folderPath, fileName, imageData.mimeType);
-      
-      setFormData({
-        ...formData,
-        imageUrl: downloadURL
-      });
-      
-      showToast('התמונה הועלתה בהצלחה', 'success');
+      // שמירת ה-URI המקומי לתצוגה מקדימה מיידית
+      setSelectedImageUri(imageData.uri);
+      showToast('תמונה נבחרה! לחץ "הוסף תמונה" להעלאה', 'success');
     } catch (error: any) {
-      console.error('Error uploading image:', error);
-      const errorMessage = error?.message || 'שגיאה בהעלאת התמונה';
-      if (errorMessage.includes('אין הרשאה') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
-        showToast('אין הרשאה להעלות תמונות. אנא וודא שאתה מחובר כמנהל.', 'error');
-      } else {
-        showToast(errorMessage, 'error');
-      }
+      console.error('Error selecting image:', error);
+      showToast('שגיאה בבחירת התמונה', 'error');
     }
   };
 
   const validateForm = () => {
-    if (!formData.imageUrl.trim()) {
-      showToast('נא להזין קישור לתמונה', 'error');
+    // אם יש תמונה שנבחרה (URI מקומי) או קישור תקין, זה בסדר
+    if (!selectedImageUri && !formData.imageUrl.trim()) {
+      showToast('נא לבחור תמונה או להזין קישור', 'error');
       return false;
     }
-    
-    // Basic URL validation
-    try {
-      new URL(formData.imageUrl);
-    } catch {
-      showToast('נא להזין קישור תקין', 'error');
-      return false;
+
+    // אם יש קישור, בדוק שהוא תקין
+    if (formData.imageUrl.trim()) {
+      try {
+        new URL(formData.imageUrl);
+      } catch {
+        showToast('נא להזין קישור תקין', 'error');
+        return false;
+      }
     }
 
     if (isNaN(Number(formData.order))) {
@@ -358,10 +303,24 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     if (!validateForm()) return;
 
     try {
-      console.log('🔄 Saving image to Firebase...', formData);
-      
-      const imageUrl = formData.imageUrl.trim();
-      
+      setIsUploading(true);
+      showToast('שומר תמונה...', 'success');
+
+      let imageUrl = formData.imageUrl.trim();
+
+      // אם נבחרה תמונה מהמכשיר, העלה אותה עכשיו
+      if (selectedImageUri) {
+        showToast('מעלה תמונה לשרת...', 'success');
+
+        // קבע סוג קובץ
+        let extension = 'jpg';
+        const fileName = `img_${Date.now()}.${extension}`;
+        const folderPath = formData.type === 'background' ? 'backgrounds' : formData.type;
+
+        imageUrl = await uploadImageToStorage(selectedImageUri, folderPath, fileName, 'image/jpeg');
+        console.log('✅ Image uploaded:', imageUrl);
+      }
+
       if (editingImage) {
         // Update existing image
         const imageData = {
@@ -431,7 +390,8 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         const newImageId = await addGalleryImage(imageData);
         console.log('✅ Image saved with ID:', newImageId);
         
-        // If background or aboutus, also update settings/images
+        // If background, also update settings/images (overwrites existing)
+        // Note: aboutus images cannot be changed - they are protected
         if (formData.type === 'background') {
           const { setDoc, doc, getDoc } = await import('firebase/firestore');
           const { db } = await import('../../config/firebase');
@@ -442,19 +402,9 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             ...currentData,
             atmosphereImage: imageUrl
           }, { merge: true });
-          console.log('✅ Updated atmosphereImage in settings');
-        } else if (formData.type === 'aboutus') {
-          const { setDoc, doc, getDoc } = await import('firebase/firestore');
-          const { db } = await import('../../config/firebase');
-          const settingsRef = doc(db, 'settings', 'images');
-          const settingsSnap = await getDoc(settingsRef);
-          const currentData = settingsSnap.exists() ? settingsSnap.data() : {};
-          await setDoc(settingsRef, {
-            ...currentData,
-            aboutUsImage: imageUrl
-          }, { merge: true });
-          console.log('✅ Updated aboutUsImage in settings');
+          console.log('✅ Updated atmosphereImage in settings (overwrites existing)');
         }
+        // aboutus images are protected - cannot be changed
         
         setImages(prev => [...prev, { id: newImageId, ...imageData, createdAt: new Date() as any }]);
         showToast('התמונה נוספה בהצלחה');
@@ -475,13 +425,12 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       setImages(refreshedImages);
       console.log('✅ Refreshed images, total count:', refreshedImages.length);
       console.log('✅ Background images:', refreshedImages.filter(img => img.type === 'background'));
-      
-      // Refresh storage images
-      const storageImagesData = await getAllStorageImages();
-      setStorageImages(storageImagesData);
     } catch (error) {
       console.error('Error saving image:', error);
       showToast('שגיאה בהוספת התמונה', 'error');
+    } finally {
+      setIsUploading(false);
+      setSelectedImageUri(null);
     }
   };
 
@@ -643,29 +592,6 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   };
 
   const filteredImages = images.filter(img => img.type === selectedTab);
-  
-  // Get Firebase Storage images for current tab
-  const getStorageImagesForTab = () => {
-    switch (selectedTab) {
-      case 'gallery':
-        return storageImages.gallery;
-      case 'background':
-        return storageImages.backgrounds;
-      case 'splash':
-        return storageImages.splash;
-      case 'aboutus':
-        return storageImages.aboutus;
-      case 'treatments':
-        return storageImages.treatments;
-      // case 'shop':
-      //   return storageImages.workers; // REMOVE THIS LINE
-      default:
-        return [];
-    }
-  };
-
-  // Only use getStorageImagesForTab for non-shop tabs
-  const storageImagesForTab = (selectedTab === 'shop') ? [] : getStorageImagesForTab();
 
   const tabs = [
     { key: 'gallery', label: 'גלריה', icon: 'images' },
@@ -800,8 +726,8 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   // טען תמונות shop מהסטורג'
   const fetchShopStorageImages = async () => {
     try {
-      const all = await getAllStorageImages() as Record<string, string[]>;
-      setShopStorageImages(all.shop || []);
+      // נטען רק תמונות shop שנמצאות בפועל במוצרים
+      setShopStorageImages([]);
     } catch (e) {
       showToast('שגיאה בטעינת תמונות מהסטורג׳', 'error');
     }
@@ -852,17 +778,17 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         {/* Add Image Button */}
         <View style={styles.header}>
           {selectedTab === 'shop' ? (
-            <TouchableOpacity 
-              style={styles.addButton} 
+            <TouchableOpacity
+              style={styles.addButton}
               onPress={() => {
-                setShopForm({ 
-                  name: '', 
+                setShopForm({
+                  name: '',
                   description: '',
-                  price: '', 
+                  price: '',
                   category: '',
-                  imageUrl: '', 
+                  imageUrl: '',
                   stock: '',
-                  editingId: null 
+                  editingId: null
                 });
                 setShopModalVisible(true);
               }}
@@ -871,26 +797,79 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
               <Text style={styles.addButtonText}>הוסף מוצר חדש</Text>
             </TouchableOpacity>
           ) : (
-            <>
-              <TouchableOpacity 
-                style={styles.addButton} 
-                onPress={() => isImageTab(selectedTab) && openAddModal(selectedTab)}
-                disabled={!isImageTab(selectedTab)}
-              >
-                <Ionicons name="add" size={24} color="#fff" />
-                <Text style={styles.addButtonText}>
-                  {isImageTab(selectedTab) ? `הוסף תמונה ל${getTabTitle(selectedTab)}` : ''}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.uploadButton} 
-                onPress={uploadImageFromDevice}
+              <TouchableOpacity
+                style={styles.uploadButton}
+                onPress={async () => {
+                  try {
+                    // בחר תמונה ישירות
+                    const imageData = await pickImageFromDevice();
+                    if (!imageData) {
+                      console.log('❌ No image selected');
+                      return;
+                    }
+
+                    console.log('✅ Image selected:', imageData.uri);
+                    setIsUploading(true);
+                    showToast('מעלה תמונה...', 'success');
+
+                    // העלה ישירות לשרת
+                    let extension = 'jpg';
+                    if (imageData.mimeType?.includes('png')) extension = 'png';
+                    else if (imageData.mimeType?.includes('webp')) extension = 'webp';
+
+                    const fileName = `img_${Date.now()}.${extension}`;
+                    const folderPath = selectedTab === 'background' ? 'backgrounds' : selectedTab;
+
+                    console.log('📤 Uploading image:', {
+                      uri: imageData.uri,
+                      folder: folderPath,
+                      fileName: fileName,
+                      mimeType: imageData.mimeType
+                    });
+
+                    const downloadURL = await uploadImageToStorage(imageData.uri, folderPath, fileName, imageData.mimeType);
+                    console.log('✅ Upload successful, URL:', downloadURL);
+
+                    // Check if single image restriction applies
+                    if (selectedTab !== 'gallery') {
+                      const existingImages = images.filter(img => img.type === selectedTab);
+                      if (existingImages.length > 0) {
+                        showToast(`יכולה להיות רק תמונה אחת עבור ${getTabTitle(selectedTab)}`, 'error');
+                        setIsUploading(false);
+                        return;
+                      }
+                    }
+
+                    // הוסף לגלריה
+                    const imageData2 = {
+                      imageUrl: downloadURL,
+                      type: selectedTab,
+                      order: images.filter(img => img.type === selectedTab).length,
+                      isActive: true
+                    };
+
+                    console.log('📝 Adding image to gallery:', imageData2);
+                    const newImageId = await addGalleryImage(imageData2);
+                    setImages(prev => [...prev, { id: newImageId, ...imageData2, createdAt: new Date() as any }]);
+
+                    showToast('התמונה הועלתה בהצלחה!', 'success');
+                    console.log('✅ Image added successfully with ID:', newImageId);
+                  } catch (error: any) {
+                    console.error('❌ Error uploading image:', error);
+                    const errorMessage = error?.message || 'שגיאה לא ידועה';
+                    showToast(`שגיאה בהעלאת התמונה: ${errorMessage}`, 'error');
+                    Alert.alert('שגיאה', `שגיאה בהעלאת התמונה:\n${errorMessage}`);
+                  } finally {
+                    setIsUploading(false);
+                  }
+                }}
+                disabled={isUploading}
               >
                 <Ionicons name="phone-portrait" size={24} color="#fff" />
-                <Text style={styles.uploadButtonText}>העלה מהטלפון</Text>
+                <Text style={styles.uploadButtonText}>
+                  {isUploading ? 'מעלה...' : 'העלה מהטלפון'}
+                </Text>
               </TouchableOpacity>
-            </>
           )}
         </View>
 
@@ -901,85 +880,10 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
           </View>
         ) : (
           <ScrollView style={styles.imagesList}>
-            {/* Firebase Storage Images Section */}
-            {storageImagesForTab.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>תמונות מ-Firebase Storage</Text>
-                <View style={styles.imagesGrid}>
-                  {storageImagesForTab.map((imageUrl, index) => (
-                    <View key={`storage-${index}`} style={styles.imageCard}>
-                      <Image
-                        source={{ uri: imageUrl }}
-                        style={styles.imagePreview}
-                        defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
-                      />
-                      <View style={styles.imageInfo}>
-                        <Text style={styles.imageOrder}>Firebase Storage</Text>
-                        <Text style={styles.imageStatus}>פעיל</Text>
-                      </View>
-                      <View style={styles.imageActions}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.addToGalleryButton]}
-                          onPress={() => {
-                            setFormData({
-                              imageUrl: imageUrl,
-                              type: selectedTab === 'shop' ? 'gallery' : selectedTab,
-                              order: '0'
-                            });
-                            setModalVisible(true);
-                          }}
-                        >
-                          <Ionicons name="add-circle" size={18} color="#007bff" />
-                          <Text style={[styles.actionButtonText, { fontSize: 14 }]}>הוסף לגלריה</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.deleteStorageButton, styles.deleteButtonCompact]}
-                          onPress={() => {
-                            Alert.alert(
-                              'מחיקת תמונה',
-                              'האם אתה בטוח שברצונך למחוק תמונה זו מ-Firebase Storage? פעולה זו אינה ניתנת לביטול.',
-                              [
-                                { text: 'ביטול', style: 'cancel' },
-                                {
-                                  text: 'מחק',
-                                  style: 'destructive',
-                                  onPress: async () => {
-                                    try {
-                                      showToast('מוחק תמונה...', 'success');
-                                      const { deleteObject, ref } = await import('firebase/storage');
-                                      const { storage } = await import('../../config/firebase');
-                                      const imageRef = ref(storage, imageUrl);
-                                      await deleteObject(imageRef);
-                                      showToast('התמונה נמחקה בהצלחה מ-Storage', 'success');
-
-                                      // Reload storage images
-                                      const storageImagesData = await getAllStorageImages();
-                                      setStorageImages(storageImagesData);
-                                    } catch (error: any) {
-                                      console.error('Error deleting from storage:', error);
-                                      showToast('שגיאה במחיקת התמונה מ-Storage', 'error');
-                                    }
-                                  }
-                                }
-                              ]
-                            );
-                          }}
-                        >
-                          <Ionicons name="trash" size={18} color="#fff" />
-                          <Text style={styles.deleteStorageButtonText}>מחק</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-            
-            {/* Firestore Images Section */}
+            {/* תמונות בגלריה */}
             {filteredImages.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>תמונות מ-Firestore</Text>
+                <Text style={styles.sectionTitle}>התמונות שלי</Text>
                 <View style={styles.imagesGrid}>
                   {filteredImages.map((image) => (
                     <View key={image.id} style={styles.imageCard}>
@@ -989,32 +893,12 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                         defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
                       />
                       <View style={styles.imageOverlay}>
-                        <View style={styles.orderControls}>
-                          <TouchableOpacity
-                            style={styles.orderButton}
-                            onPress={() => handleMoveUp(image)}
-                          >
-                            <Ionicons name="chevron-up" size={16} color="#fff" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.orderButton}
-                            onPress={() => handleMoveDown(image)}
-                          >
-                            <Ionicons name="chevron-down" size={16} color="#fff" />
-                          </TouchableOpacity>
-                        </View>
                         <View style={styles.actionControls}>
-                          <TouchableOpacity
-                            style={styles.editImageButton}
-                            onPress={() => openEditModal(image)}
-                          >
-                            <Ionicons name="pencil" size={18} color="#fff" />
-                          </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.deleteImageButton}
                             onPress={() => handleDelete(image.id)}
                           >
-                            <Ionicons name="trash" size={18} color="#fff" />
+                            <Ionicons name="trash" size={20} color="#fff" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1022,49 +906,26 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                         <Text style={styles.imageOrder}>סדר: {image.order}</Text>
                         <Text style={styles.imageStatus}>{image.isActive ? 'פעיל' : 'לא פעיל'}</Text>
                       </View>
-                      <View style={styles.imageActions}>
-                        <TouchableOpacity 
-                          style={[styles.reorderButton, styles.moveUpButton]}
-                          onPress={() => handleMoveUp(image)}
-                        >
-                          <Ionicons name="chevron-up" size={20} color="#007bff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.reorderButton, styles.moveDownButton]}
-                          onPress={() => handleMoveDown(image)}
-                        >
-                          <Ionicons name="chevron-down" size={20} color="#007bff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.editButton}
-                          onPress={() => openEditModal(image)}
-                        >
-                          <Ionicons name="create" size={20} color="#28a745" />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.deleteButton}
-                          onPress={() => handleDelete(image.id)}
-                        >
-                          <Ionicons name="trash" size={20} color="#dc3545" />
-                        </TouchableOpacity>
-                      </View>
                     </View>
                   ))}
                 </View>
               </View>
             )}
-            
+
             {/* Empty State */}
-            {filteredImages.length === 0 && storageImagesForTab.length === 0 && (
+            {filteredImages.length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name={getTabIcon(selectedTab) as any} size={64} color="#ccc" />
                 <Text style={styles.emptyStateText}>אין תמונות ב{getTabTitle(selectedTab)}</Text>
-                <TouchableOpacity 
-                  style={styles.emptyAddButton} 
-                  onPress={() => openAddModal(selectedTab === 'shop' ? 'gallery' : selectedTab)}
-                >
-                  <Text style={styles.emptyAddButtonText}>הוסף תמונה ראשונה</Text>
-                </TouchableOpacity>
+                {/* Hide add button for aboutus - cannot be changed */}
+                {selectedTab !== 'aboutus' && (
+                  <TouchableOpacity 
+                    style={styles.emptyAddButton} 
+                    onPress={() => openAddModal(selectedTab === 'shop' ? 'gallery' : selectedTab)}
+                  >
+                    <Text style={styles.emptyAddButtonText}>הוסף תמונה ראשונה</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </ScrollView>
@@ -1090,40 +951,28 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             </View>
 
             <ScrollView style={styles.modalBody}>
-              {editingImage && (
-                <View style={styles.editingInfo}>
-                  <Text style={styles.editingInfoText}>
-                    🔧 עריכת תמונה - סדר נוכחי: {editingImage.order}
-                  </Text>
+              {/* תצוגה מקדימה גדולה */}
+              {(selectedImageUri || formData.imageUrl) && (
+                <View style={styles.bigPreviewContainer}>
+                  <Image
+                    source={{ uri: selectedImageUri || formData.imageUrl }}
+                    style={styles.bigPreviewImage}
+                    resizeMode="contain"
+                  />
                 </View>
               )}
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>תמונה</Text>
-                
-                {/* Upload from device button */}
-                <TouchableOpacity
-                  style={styles.uploadButton}
-                  onPress={uploadImageFromDevice}
-                >
-                  <Ionicons name="cloud-upload" size={20} color="#007bff" />
-                  <Text style={styles.uploadButtonText}>
-                    {editingImage ? 'החלף תמונה מהמכשיר' : 'העלה תמונה מהמכשיר'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <Text style={styles.orText}>או</Text>
-                
-                {/* URL input */}
-                <TextInput
-                  style={styles.textInput}
-                  value={formData.imageUrl}
-                  onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
-                  placeholder="https://example.com/image.jpg"
-                  textAlign="right"
-                  autoCapitalize="none"
-                />
-              </View>
+
+              {/* כפתור בחירת תמונה - גדול וברור */}
+              <TouchableOpacity
+                style={styles.bigSelectButton}
+                onPress={selectImageFromDevice}
+                disabled={isUploading}
+              >
+                <Ionicons name="image" size={32} color="#fff" />
+                <Text style={styles.bigSelectButtonText}>
+                  {selectedImageUri ? 'החלף תמונה' : 'בחר תמונה'}
+                </Text>
+              </TouchableOpacity>
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>סדר תצוגה</Text>
@@ -1138,26 +987,6 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                 <Text style={styles.inputHint}>
                   תמונות עם מספר נמוך יותר יופיעו קודם
                 </Text>
-              </View>
-
-              {/* Image Preview */}
-              {formData.imageUrl && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>תצוגה מקדימה</Text>
-                  <Image
-                    source={{ uri: formData.imageUrl }}
-                    style={styles.previewImage}
-                    defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
-                  />
-                </View>
-              )}
-
-              <View style={styles.guidelinesContainer}>
-                <Text style={styles.guidelinesTitle}>הנחיות לתמונות:</Text>
-                <Text style={styles.guideline}>• יחס גובה-רוחב מומלץ: 4:3</Text>
-                <Text style={styles.guideline}>• רזולוציה מינימלית: 800x600</Text>
-                <Text style={styles.guideline}>• פורמטים נתמכים: JPG, PNG</Text>
-                <Text style={styles.guideline}>• גודל קובץ מקסימלי: 5MB</Text>
               </View>
             </ScrollView>
 
@@ -1570,9 +1399,14 @@ const styles = StyleSheet.create({
     right: 8,
   },
   deleteImageButton: {
-    backgroundColor: 'rgba(220, 53, 69, 0.8)',
+    backgroundColor: 'rgba(220, 53, 69, 0.9)',
     borderRadius: 20,
-    padding: 8,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   imageInfo: {
     padding: 12,
@@ -1835,6 +1669,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 6,
+  },
+  bigPreviewContainer: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bigPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bigSelectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007bff',
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginBottom: 24,
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  bigSelectButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 12,
   },
 });
 

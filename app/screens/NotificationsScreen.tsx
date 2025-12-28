@@ -51,12 +51,14 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
       setLoading(true);
       const user = getCurrentUser();
       if (user) {
-        // Delete old notifications (older than 6 hours)
-        await deleteOldNotifications(user.uid, 6);
-        
-        // Load real notifications only
+        // Load notifications first
         const userNotifications = await getUserNotifications(user.uid);
         setNotifications(userNotifications);
+        
+        // Delete old notifications in background (don't wait for it) - 48 hours
+        deleteOldNotifications(user.uid, 48).catch(err => {
+          console.error('Error deleting old notifications:', err);
+        });
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
