@@ -5,9 +5,9 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import 'nativewind';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Alert, AppState, AppStateStatus, View } from 'react-native';
 import 'react-native-reanimated';
 import '../app/globals.css';
 import { auth } from '../config/firebase';
@@ -81,31 +81,50 @@ export default function RootLayout() {
   // Note: Push token registration is now only done when user explicitly enables notifications
   // via settings or onboarding flow, not automatically on login
 
-  // Check for updates on app start
+  // Check for updates on app start and auto-fetch in background
   useEffect(() => {
-    async function checkForUpdates() {
+    async function checkAndFetchUpdates() {
       try {
         // Only check for updates in production
         if (!__DEV__) {
+          console.log('🔄 Checking for EAS updates...');
           const update = await Updates.checkForUpdateAsync();
+          
           if (update.isAvailable) {
-            Alert.alert(
-              'עדכון זמין',
-              'יש עדכון חדש לאפליקציה. האם ברצונך להוריד אותו עכשיו?',
-              [
-                {
-                  text: 'לא עכשיו',
-                  style: 'cancel',
-                },
-                {
-                  text: 'עדכן',
-                  onPress: async () => {
-                    await Updates.fetchUpdateAsync();
-                    await Updates.reloadAsync();
+            console.log('✅ Update available, fetching in background...');
+            try {
+              // Fetch update in background (non-blocking)
+              await Updates.fetchUpdateAsync();
+              console.log('✅ Update fetched successfully, reloading app...');
+              // Reload app to apply update immediately
+              await Updates.reloadAsync();
+            } catch (fetchError) {
+              console.error('❌ Error fetching update:', fetchError);
+              // If fetch fails, show alert as fallback
+              Alert.alert(
+                'עדכון זמין',
+                'יש עדכון חדש לאפליקציה. האם ברצונך להוריד אותו עכשיו?',
+                [
+                  {
+                    text: 'לא עכשיו',
+                    style: 'cancel',
                   },
-                },
-              ]
-            );
+                  {
+                    text: 'עדכן',
+                    onPress: async () => {
+                      try {
+                        await Updates.fetchUpdateAsync();
+                        await Updates.reloadAsync();
+                      } catch (error) {
+                        console.error('Error applying update:', error);
+                      }
+                    },
+                  },
+                ]
+              );
+            }
+          } else {
+            console.log('ℹ️ No updates available');
           }
         }
       } catch (error) {
@@ -113,7 +132,20 @@ export default function RootLayout() {
       }
     }
 
-    checkForUpdates();
+    // Check immediately on app start
+    checkAndFetchUpdates();
+    
+    // Also check when app comes to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('🔄 App came to foreground, checking for updates...');
+        checkAndFetchUpdates();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   // Process scheduled reminders every 5 minutes (only for admin users)

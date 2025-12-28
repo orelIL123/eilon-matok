@@ -18,7 +18,7 @@ import { db } from '../config/firebase';
 // TYPES
 // ============================================================================
 
-export type ReminderKind = 'T_MINUS_24H' | 'T_MINUS_1H' | 'AT_TIME';
+export type ReminderKind = 'T_MINUS_24H' | 'T_MINUS_1H' | 'T_MINUS_5M' | 'AT_TIME';
 
 export interface ReminderSpec {
   id: string;                 // deterministic ID for cancel/update
@@ -355,6 +355,7 @@ export async function scheduleAppointmentReminders(appointment: AppointmentRemin
     // Calculate reminder times
     const t24h = new Date(appointmentTime.getTime() - 24 * 60 * 60 * 1000);
     const t1h = new Date(appointmentTime.getTime() - 1 * 60 * 60 * 1000);
+    const t5m = new Date(appointmentTime.getTime() - 5 * 60 * 1000);
     const tAt = appointmentTime;
 
     // Build reminder specifications based on admin settings
@@ -393,6 +394,19 @@ export async function scheduleAppointmentReminders(appointment: AppointmentRemin
     } else {
       console.log('🔕 T-1h reminder disabled by admin');
     }
+
+    // T-5m reminder (always enabled for customers - push notification only)
+    specs.push({
+      id: `${appointment.id}:T_MINUS_5M`,
+      when: t5m,
+      title: '💈 תזכורת לתור',
+      body: `התור שלך בעוד 5 דקות ב-${appointmentTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+      data: {
+        appointmentId: appointment.id,
+        kind: 'T_MINUS_5M',
+        type: 'appointment-reminder',
+      },
+    });
 
     // T-0 (at time) reminder (if enabled by admin)
     if (adminSettings.customerReminderSettings?.t0Enabled !== false) {
@@ -456,7 +470,7 @@ export async function cancelAppointmentReminders(appointmentId: string): Promise
   try {
     console.log('🔄 Cancelling reminders for appointment:', appointmentId);
 
-    const kinds: ReminderKind[] = ['T_MINUS_24H', 'T_MINUS_1H', 'AT_TIME'];
+    const kinds: ReminderKind[] = ['T_MINUS_24H', 'T_MINUS_1H', 'T_MINUS_5M', 'AT_TIME'];
 
     for (const kind of kinds) {
       const id = `${appointmentId}:${kind}`;

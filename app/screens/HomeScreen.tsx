@@ -38,7 +38,7 @@ interface HomeScreenProps {
 
 
 // Simple NeonButton component
-// Ultra-Fast Gallery Image Component - Aggressive Loading
+// Ultra-Fast Gallery Image Component - Simple and fast
 const OptimizedGalleryImage = React.memo(({ source, style }: {
   source: { uri: string };
   style: any;
@@ -46,22 +46,14 @@ const OptimizedGalleryImage = React.memo(({ source, style }: {
 }) => {
   const [hasError, setHasError] = useState(false);
 
-  // Start loading immediately when component mounts
-  useEffect(() => {
-    // Prefetch image to cache
-    Image.prefetch(source.uri).catch((err) => {
-      console.warn('Image prefetch failed:', source.uri, err);
-    });
-  }, [source.uri]);
-
   if (hasError) {
     return (
       <View style={[style, {
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#f5f5f5',
         justifyContent: 'center',
         alignItems: 'center'
       }]}>
-        <Ionicons name="image-outline" size={32} color="#555" />
+        <Ionicons name="image-outline" size={32} color="#ccc" />
       </View>
     );
   }
@@ -75,7 +67,7 @@ const OptimizedGalleryImage = React.memo(({ source, style }: {
         console.warn('Image load error:', source.uri, error);
         setHasError(true);
       }}
-      fadeDuration={0} // Instant display - no fade
+      fadeDuration={200} // Smooth fade in
     />
   );
 }, (prevProps, nextProps) => {
@@ -149,8 +141,9 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const cardSpacing = 16; // Increased from 8
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Get original images array - only from Firebase, no hardcoded fallbacks
-  const originalImages = settingsImages.gallery.length > 0 ? settingsImages.gallery : [];
+  // Get original images array - only from Firebase, limit to first 6 for faster loading
+  const allImages = settingsImages.gallery.length > 0 ? settingsImages.gallery : [];
+  const originalImages = allImages.slice(0, 6); // Limit to first 6 images for performance
 
   // Create infinite scroll data by duplicating images (only if we have images)
   const infiniteImages = originalImages.length > 0
@@ -407,6 +400,19 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         atmosphere: atmosphereImage,
         aboutUs: aboutUsImage,
         gallery: galleryImages,
+      });
+
+      // Prefetch only first 6 gallery images for faster initial load
+      const imagesToPrefetch = galleryImages.slice(0, 6);
+      console.log(`🖼️ Prefetching first ${imagesToPrefetch.length} gallery images...`);
+      imagesToPrefetch.forEach((imageUrl, index) => {
+        if (imageUrl) {
+          Image.prefetch(imageUrl).then(() => {
+            console.log(`✅ Prefetched image ${index + 1}/${imagesToPrefetch.length}`);
+          }).catch(err => {
+            console.warn(`⚠️ Failed to prefetch image ${index + 1}:`, imageUrl, err);
+          });
+        }
       });
 
       console.log('✅ Loaded Firebase images:', {
