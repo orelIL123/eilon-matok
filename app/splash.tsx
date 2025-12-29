@@ -1,15 +1,22 @@
 import { useRouter } from 'expo-router';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 import { authManager } from '../services/authManager';
 
+// Keep the native splash screen visible while we're loading
+ExpoSplashScreen.preventAutoHideAsync();
+
 export default function SplashScreen() {
   const router = useRouter();
-  const fadeAnim = React.useRef(new Animated.Value(1)).current; // Start at 1 (visible)
+  const fadeAnim = React.useRef(new Animated.Value(1)).current; // Start at 1 (visible immediately)
 
   useEffect(() => {
-    // Already visible from the start - no fade in animation needed
-    // This eliminates the "small square" flicker
+    // Hide native splash screen immediately when component mounts
+    // The expo splash is already visible (opacity 1) so transition is seamless
+    ExpoSplashScreen.hideAsync().catch(() => {
+      // Ignore errors if splash is already hidden
+    });
 
     // Check auth state using the new AuthManager
     let authStateChecked = false;
@@ -85,15 +92,13 @@ export default function SplashScreen() {
       }
     };
 
-    // Start auth check after animation
-    const timer = setTimeout(checkAuthState, 2000);
-
-    return () => clearTimeout(timer);
+    // Start auth check immediately (no delay needed since native splash is already showing)
+    checkAuthState();
   }, []);
 
   return (
     <View style={styles.container}>
-      {/* Main splash image in center */}
+      {/* Main splash image - full screen */}
       <Animated.View
         style={[
           styles.imageContainer,

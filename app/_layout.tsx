@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import 'nativewind';
@@ -16,6 +17,9 @@ import AppAuthGate from './components/AppAuthGate';
 import i18n from './i18n';
 
 import { useColorScheme } from '../hooks/useColorScheme';
+
+// Prevent the splash screen from auto-hiding before we're ready
+SplashScreen.preventAutoHideAsync();
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -187,6 +191,9 @@ export default function RootLayout() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Don't hide splash screen here - let splash.tsx handle it
+  // This ensures smooth transition from native splash to expo splash
 
   if (!loaded) {
     // Show black screen while fonts are loading (matches splash screen)

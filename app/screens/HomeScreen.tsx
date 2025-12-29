@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,7 +10,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   ImageBackground,
   InteractionManager,
   Linking,
@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { getActiveBroadcastMessages, getCurrentUser, getUserNotifications } from '../../services/firebase';
 import NotificationPanel from '../components/NotificationPanel';
+import OptimizedImage from '../components/OptimizedImage';
 import ScissorsLoader from '../components/ScissorsLoader';
 import SideMenu from '../components/SideMenu';
 import TermsModal from '../components/TermsModal';
@@ -38,43 +39,6 @@ interface HomeScreenProps {
 
 
 // Simple NeonButton component
-// Ultra-Fast Gallery Image Component - Simple and fast
-const OptimizedGalleryImage = React.memo(({ source, style }: {
-  source: { uri: string };
-  style: any;
-  priority?: boolean;
-}) => {
-  const [hasError, setHasError] = useState(false);
-
-  if (hasError) {
-    return (
-      <View style={[style, {
-        backgroundColor: '#f5f5f5',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }]}>
-        <Ionicons name="image-outline" size={32} color="#ccc" />
-      </View>
-    );
-  }
-
-  return (
-    <Image
-      source={source}
-      style={style}
-      resizeMode="cover"
-      onError={(error) => {
-        console.warn('Image load error:', source.uri, error);
-        setHasError(true);
-      }}
-      fadeDuration={200} // Smooth fade in
-    />
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if URI changes
-  return prevProps.source.uri === nextProps.source.uri;
-});
-OptimizedGalleryImage.displayName = 'OptimizedGalleryImage';
 
 const NeonButton: React.FC<{
   title: string;
@@ -402,12 +366,24 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         gallery: galleryImages,
       });
 
-      // Prefetch only first 6 gallery images for faster initial load
-      const imagesToPrefetch = galleryImages.slice(0, 6);
+      // Prefetch critical images (atmosphere, aboutUs) immediately
+      if (atmosphereImage) {
+        Image.prefetch(atmosphereImage, 'memory-disk').catch(err => {
+          console.warn('Failed to prefetch atmosphere image:', err);
+        });
+      }
+      if (aboutUsImage) {
+        Image.prefetch(aboutUsImage, 'memory-disk').catch(err => {
+          console.warn('Failed to prefetch aboutUs image:', err);
+        });
+      }
+
+      // Prefetch first 8 gallery images for faster initial load using expo-image
+      const imagesToPrefetch = galleryImages.slice(0, 8);
       console.log(`🖼️ Prefetching first ${imagesToPrefetch.length} gallery images...`);
       imagesToPrefetch.forEach((imageUrl, index) => {
         if (imageUrl) {
-          Image.prefetch(imageUrl).then(() => {
+          Image.prefetch(imageUrl, 'memory-disk').then(() => {
             console.log(`✅ Prefetched image ${index + 1}/${imagesToPrefetch.length}`);
           }).catch(err => {
             console.warn(`⚠️ Failed to prefetch image ${index + 1}:`, imageUrl, err);
@@ -839,10 +815,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                             getCardTransform(index, scrollX),
                           ]}
                         >
-                          <OptimizedGalleryImage
-                            source={typeof img === 'string' ? { uri: img } : { uri: (img as any).uri || img }}
+                          <OptimizedImage
+                            source={typeof img === 'string' ? img : (img as any).uri || img}
                             style={styles.carousel3DImage}
-                            priority={priority}
+                            priority={priority ? 'high' : 'normal'}
+                            resizeMode="cover"
                           />
                         <View style={styles.carousel3DOverlay}>
                           <LinearGradient
@@ -867,10 +844,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           <Animated.View style={[styles.aboutSection, { opacity: cardsFade }]}>
             <Text style={styles.sectionTitle}>{t('home.about')}</Text>
             <View style={styles.aboutCard}>
-              <Image
-                source={settingsImages.aboutUs ? { uri: settingsImages.aboutUs } : require('../../assets/images/ABOUT US/aboutus.png')}
+              <OptimizedImage
+                source={settingsImages.aboutUs ? settingsImages.aboutUs : require('../../assets/images/ABOUT US/aboutus.png')}
                 style={styles.aboutImageWide}
                 resizeMode="cover"
+                priority="normal"
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>

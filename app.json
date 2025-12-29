@@ -78,7 +78,7 @@
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#8B4513"
+      "backgroundColor": "#000000"
     },
     "updates": {
       "url": "https://u.expo.dev/518e7344-df67-42cd-8107-502bd3e48357"

@@ -1,13 +1,13 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { collection, getDocs, getFirestore, onSnapshot, query, QuerySnapshot, Timestamp, where } from 'firebase/firestore';
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -30,6 +30,7 @@ import {
   Treatment
 } from '../../services/firebase';
 import ConfirmationModal from '../components/ConfirmationModal';
+import OptimizedImage from '../components/OptimizedImage';
 import ScissorsLoader from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 import { generateTimeSlots, SLOT_SIZE_MINUTES, toMin, toYMD } from '../constants/scheduling';
@@ -47,52 +48,6 @@ interface BookingScreenProps {
   };
 }
 
-// Ultra-Fast Image Component - Aggressive Loading with Prefetch
-const OptimizedImage = memo(({ source, style, resizeMode = 'cover' }: {
-  source: any;
-  style: any;
-  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
-}) => {
-  const [hasError, setHasError] = useState(false);
-  const imageUri = source?.uri || source;
-
-  // Prefetch image immediately when component mounts
-  useEffect(() => {
-    if (imageUri) {
-      Image.prefetch(imageUri).catch(err => {
-        console.warn('Image prefetch failed:', imageUri, err);
-      });
-    }
-  }, [imageUri]);
-
-  if (hasError) {
-    return (
-      <View style={[style, {
-        backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }]}>
-        <Text style={{ color: '#999', fontSize: 12 }}>✂️</Text>
-      </View>
-    );
-  }
-
-  return (
-    <Image
-      source={source}
-      style={style}
-      resizeMode={resizeMode}
-      onError={() => setHasError(true)}
-      fadeDuration={0} // Instant display - no fade for faster loading
-    />
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if URI changes
-  const prevUri = prevProps.source?.uri || prevProps.source;
-  const nextUri = nextProps.source?.uri || nextProps.source;
-  return prevUri === nextUri;
-});
-OptimizedImage.displayName = 'OptimizedImage';
 
 const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClose, route }) => {
   const { t } = useTranslation();
@@ -130,11 +85,20 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       setBarbers(barbersData);
       setTreatments(treatmentsData);
 
-      // Prefetch all barber images immediately for instant loading
+      // Prefetch all barber images immediately for instant loading using expo-image
       barbersData.forEach(barber => {
         if (barber.image) {
-          Image.prefetch(barber.image).catch(err => {
+          Image.prefetch(barber.image, 'memory-disk').catch(err => {
             console.warn('Failed to prefetch barber image:', barber.image, err);
+          });
+        }
+      });
+
+      // Prefetch treatment images
+      treatmentsData.forEach(treatment => {
+        if (treatment.image) {
+          Image.prefetch(treatment.image, 'memory-disk').catch(err => {
+            console.warn('Failed to prefetch treatment image:', treatment.image, err);
           });
         }
       });

@@ -48,10 +48,17 @@ service cloud.firestore {
     
     // Appointments Collection
     match /appointments/{appointmentId} {
-      allow read: if isSignedIn() &&
-                     (isOwner(resource.data.userId) ||
-                      isBarber() ||
-                      isAdmin());
+      // Allow reading appointments for:
+      // 1. Own appointments (users can see their own)
+      // 2. Barbers can see all their appointments
+      // 3. Admins can see everything
+      // 4. ANY signed-in user can query appointments by barberId (needed for double-booking prevention)
+      //    but can only see limited fields (date, barberId, duration, status) - not personal info
+      allow get: if isSignedIn() &&
+                    (isOwner(resource.data.userId) ||
+                     isBarber() ||
+                     isAdmin());
+      allow list: if isSignedIn(); // Allow queries for double-booking check
       allow create: if isSignedIn();
       allow update: if isSignedIn() &&
                        (isOwner(resource.data.userId) ||

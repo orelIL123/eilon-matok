@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { memo, useEffect, useState } from 'react';
 import {
     Alert,
-    Image,
     KeyboardAvoidingView,
     Linking,
     Modal,
@@ -30,6 +29,7 @@ import {
     updateBarberProfile,
     uploadImageToStorage
 } from '../../services/firebase';
+import OptimizedImage from '../components/OptimizedImage';
 import ScissorsLoader from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -39,39 +39,6 @@ interface AdminTeamScreenProps {
   onBack?: () => void;
 }
 
-// Optimized Image Component with lazy loading
-const OptimizedImage = memo(({ source, style, resizeMode = 'cover' }: {
-  source: any;
-  style: any;
-  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
-}) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  return (
-    <View style={[style, { backgroundColor: '#f0f0f0' }]}>
-      {!isLoaded && !hasError && (
-        <View style={[style, { 
-          position: 'absolute', 
-          backgroundColor: '#f0f0f0', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }]}>
-          <Text style={{ color: '#999', fontSize: 12 }}>טוען...</Text>
-        </View>
-      )}
-      <Image
-        source={source}
-        style={[style, { opacity: isLoaded ? 1 : 0 }]}
-        resizeMode={resizeMode}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setHasError(true)}
-        fadeDuration={200}
-      />
-    </View>
-  );
-});
-OptimizedImage.displayName = 'OptimizedImage';
 
 const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack }) => {
   const [barbers, setBarbers] = useState<Barber[]>([]);

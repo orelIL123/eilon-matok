@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
-    Image,
     Modal,
     SafeAreaView,
     ScrollView,
@@ -13,6 +12,7 @@ import {
     View
 } from 'react-native';
 import { Barber, getBarbers } from '../../services/firebase';
+import OptimizedImage from '../components/OptimizedImage';
 import ScissorsLoader from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
@@ -119,10 +119,11 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
       {/* Hero Section */}
       <View style={styles.heroSection}>
         {atmosphereImage ? (
-          <Image
-            source={{ uri: atmosphereImage }}
+          <OptimizedImage
+            source={atmosphereImage}
             style={styles.heroImage}
             resizeMode="cover"
+            priority="high"
           />
         ) : (
           <View style={[styles.heroImage, { backgroundColor: '#333' }]} />
@@ -153,8 +154,8 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
                   <View style={styles.barberImageContainer}>
                     <View style={styles.barberImage}>
                       {barber.image ? (
-                        <Image
-                          source={{ uri: barber.image }}
+                        <OptimizedImage
+                          source={barber.image}
                           style={styles.barberPhoto}
                           resizeMode="cover"
                         />
@@ -214,8 +215,8 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
                 <View style={styles.modalHeader}>
                   <View style={styles.modalBarberImage}>
                     {selectedBarber.image ? (
-                      <Image
-                        source={{ uri: selectedBarber.image }}
+                      <OptimizedImage
+                        source={selectedBarber.image}
                         style={styles.barberPhoto}
                         resizeMode="cover"
                       />
@@ -271,7 +272,7 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: 320, alignItems: 'center' }}>
             {detailsBarber?.image && (
-              <Image source={{ uri: detailsBarber.image }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
+              <OptimizedImage source={detailsBarber.image} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} resizeMode="cover" />
             )}
             <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>{detailsBarber?.name}</Text>
             <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>{detailsBarber?.experience}</Text>
