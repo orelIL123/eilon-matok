@@ -54,17 +54,44 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
     try {
       setLoading(true);
       const user = getCurrentUser();
+
+      console.log('🔍 MyAppointments - Current user:', user?.uid);
+
       if (!user) {
+        console.warn('❌ MyAppointments - No user logged in, redirecting to profile');
         Alert.alert(t('common.error'), 'נא להתחבר כדי לראות תורים');
         onNavigate('profile');
         return;
       }
+
+      console.log('📡 MyAppointments - Fetching data for user:', user.uid);
 
       const [appointmentsData, barbersData, treatmentsData] = await Promise.all([
         getUserAppointments(user.uid),
         getBarbers(),
         getTreatments()
       ]);
+
+      console.log('📅 MyAppointments - Loaded appointments:', appointmentsData.length);
+      console.log('📅 MyAppointments - User ID:', user.uid);
+      console.log('📅 MyAppointments - Appointment details:', appointmentsData.map(apt => ({
+        id: apt.id,
+        date: apt.date.toDate ? apt.date.toDate().toISOString() : apt.date,
+        status: apt.status,
+        barberId: apt.barberId,
+        treatmentId: apt.treatmentId,
+        userId: apt.userId // Show userId to verify it matches
+      })));
+
+      // Check if any appointments are past
+      const now = new Date();
+      const upcomingCount = appointmentsData.filter(apt => {
+        const aptDate = apt.date.toDate ? apt.date.toDate() : new Date(apt.date);
+        return aptDate >= now && apt.status !== 'completed' && apt.status !== 'cancelled';
+      }).length;
+
+      console.log('📊 MyAppointments - Upcoming appointments:', upcomingCount);
+      console.log('📊 MyAppointments - Total appointments:', appointmentsData.length);
 
       setAppointments(appointmentsData);
       setBarbers(barbersData);

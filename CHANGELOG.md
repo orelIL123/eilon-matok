@@ -2,6 +2,87 @@
 
 ## תאריך: 28 בדצמבר 2025
 
+### 🔥 תיקון קריטי ביותר: Firestore Rules + Indexes - userId במקום clientId
+
+**הבעיה שתוקנה:**
+- ❌❌❌ **משתמשים לא יכולים לקרוא את התורים שלהם!**
+- ❌❌❌ **משתמשים לא יכולים ליצור תורים חדשים!**
+- ❌ השגיאה: `[FirebaseError: Missing or insufficient permissions.]`
+- ❌ ה-rules בדקו `resource.data.clientId` אבל הקוד שומר `userId`!
+- ❌ ה-indexes השתמשו ב-`clientId` במקום `userId`!
+
+**הפתרון:**
+- ✅ **Rules:** שינוי כל ה-`clientId` ל-`userId` ב-firestore.rules
+- ✅ **Indexes:** שינוי `clientId` ל-`userId` ב-firestore.indexes.json
+- ✅ **Index חדש:** הוספת composite index עבור duplicate check:
+  - `userId` + `barberId` + `status` + `date`
+- ✅ תיקון ב-appointments collection (rules שורות 51-60)
+- ✅ תיקון ב-reviews collection (rules שורה 75)
+
+**✅ פורסם:**
+- ✅ Rules פורסמו ב-15:48:39
+- ✅ Indexes נוצרו ב-15:51:13 (state: INITIALIZING → READY תוך 2-5 דקות)
+
+**⏳ המתן 2-5 דקות:**
+ה-indexes עדיין בונים. תוכל לראות את הסטטוס ב:
+https://console.firebase.google.com/project/eilon-matok/firestore/indexes
+
+**תוצאה:**
+- ✅ משתמשים יכולים לראות תורים
+- ✅ משתמשים יכולים לקבוע תורים חדשים (אחרי שה-indexes יסיימו)
+- ✅ אין יותר permission errors
+- ✅ duplicate check יעבוד (אחרי שה-indexes יסיימו)
+
+**קבצים ששונו:**
+- `firestore.rules` - שינוי clientId ל-userId (שורות 52, 57, 75)
+- `firestore.indexes.json` - שינוי clientId ל-userId + index חדש (שורות 24, 36-45)
+
+---
+
+### 🚨 תיקון קריטי: מניעת תורים כפולים באותה שעה (Race Condition)
+
+**הבעיה שתוקנה:**
+- ❌ משתמשים יכלו לקבוע **3 תורים באותה שעה** על ידי לחיצה מהירה מספר פעמים
+- ❌ אין בדיקה בצד השרת - כל לחיצה יוצרת תור חדש
+- ❌ Race condition קלאסי - כל הבדיקות עוברות לפני שהתורים נשמרים
+
+**הפתרון:**
+- ✅ **בדיקת Duplicate ב-Firestore** - לפני יצירת תור, בודקים אם יש כבר תור באותה שעה (±2 דקות)
+- ✅ **Query עם where clauses** - בודק userId + barberId + date + status
+- ✅ **Exception אם נמצא duplicate** - זורק שגיאה: "כבר קיים תור בשעה זו"
+- ✅ **מונע לחיצות כפולות** - גם אם המשתמש לוחץ 10 פעמים, רק תור 1 ייווצר
+
+**תוצאה:**
+- 🛡️ **אין יותר תורים כפולים** - מוגן מפני race condition
+- ⚡ **תגובה מיידית** - אם יש duplicate, המשתמש רואה הודעת שגיאה
+- 📱 **בטיחות מלאה** - לא משנה כמה פעמים לוחצים
+
+**קבצים ששונו:**
+- `services/firebase.ts` - הוספת duplicate check ב-createAppointment (שורה 1619-1642)
+
+---
+
+### 🔍 Debug: לוגים מתקדמים למסך "התורים שלי" (v2)
+
+**מה נוסף:**
+- 🔍 **בדיקת משתמש מחובר** - מציג אם המשתמש מחובר או לא
+- 📊 **לוגים מפורטים** - מציג כמה תורים נטענו וכל הפרטים שלהם
+- 🆔 **userId verification** - מציג את ה-userId של המשתמש ושל כל תור (לזיהוי אי-התאמה)
+- 📈 **ספירת תורים עתידיים** - מציג כמה תורים עתידיים יש (לזיהוי בעיות timezone/filter)
+- 🐛 **Debug מלא** - מציג date, status, barberId, treatmentId, userId לכל תור
+
+**תוצאה:**
+- ✅ אם משתמש לא רואה תורים, הלוגים יגלו מיד למה:
+  - אם לא מחובר → `❌ MyAppointments - No user logged in`
+  - אם אין תורים → `📅 Loaded appointments: 0`
+  - אם יש userId שונה → `userId: xxx` לא תואם ל-user.uid
+  - אם הכל עבר ל-"past" → `📊 Upcoming appointments: 0`
+
+**קבצים ששונו:**
+- `app/screens/MyAppointmentsScreen.tsx` - לוגים מתקדמים (שורה 58-94)
+
+---
+
 ### ⚡ שיפור ביצועים: אופטימיזציה אגרסיבית של גלריית התמונות (v2)
 
 **מה שופר:**

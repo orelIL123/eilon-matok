@@ -1615,12 +1615,37 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
     if (appointmentData.duration && !isValidDuration(appointmentData.duration)) {
       throw new Error(`Duration must be a multiple of ${SLOT_SIZE_MINUTES} minutes. Got: ${appointmentData.duration} minutes`);
     }
-    
+
+    // CRITICAL: Check for duplicate appointments (prevent race condition)
+    // Check if user already has an appointment at this exact time
+    const appointmentDate = appointmentData.date as any;
+    const asDate = typeof appointmentDate?.toDate === 'function' ? appointmentDate.toDate() : new Date(appointmentDate);
+
+    // Check for existing appointments in a 2-minute window (to catch rapid clicks)
+    const twoMinutesBefore = new Date(asDate.getTime() - 2 * 60 * 1000);
+    const twoMinutesAfter = new Date(asDate.getTime() + 2 * 60 * 1000);
+
+    const duplicateCheck = query(
+      collection(db, 'appointments'),
+      where('userId', '==', appointmentData.userId),
+      where('barberId', '==', appointmentData.barberId),
+      where('date', '>=', Timestamp.fromDate(twoMinutesBefore)),
+      where('date', '<=', Timestamp.fromDate(twoMinutesAfter)),
+      where('status', 'in', ['confirmed', 'pending'])
+    );
+
+    const duplicates = await getDocs(duplicateCheck);
+
+    if (!duplicates.empty) {
+      console.warn('🚫 Duplicate appointment detected - preventing creation');
+      throw new Error('כבר קיים תור בשעה זו. אנא רענן את המסך.');
+    }
+
     const appointment = {
       ...appointmentData,
       createdAt: Timestamp.now()
     };
-    
+
     const docRef = await addDoc(collection(db, 'appointments'), appointment);
     console.log('Appointment created with ID:', docRef.id);
     
