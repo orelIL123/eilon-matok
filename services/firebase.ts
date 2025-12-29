@@ -1616,29 +1616,60 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       throw new Error(`Duration must be a multiple of ${SLOT_SIZE_MINUTES} minutes. Got: ${appointmentData.duration} minutes`);
     }
 
-    // CRITICAL: Check for duplicate appointments (prevent race condition)
-    // Check if user already has an appointment at this exact time
+    // CRITICAL: Check for overlapping appointments (prevent double-booking)
     const appointmentDate = appointmentData.date as any;
     const asDate = typeof appointmentDate?.toDate === 'function' ? appointmentDate.toDate() : new Date(appointmentDate);
+    const treatmentDuration = appointmentData.duration || 25; // Default 25 minutes if not provided
+    const appointmentEnd = new Date(asDate.getTime() + treatmentDuration * 60 * 1000);
 
-    // Check for existing appointments in a 2-minute window (to catch rapid clicks)
-    const twoMinutesBefore = new Date(asDate.getTime() - 2 * 60 * 1000);
-    const twoMinutesAfter = new Date(asDate.getTime() + 2 * 60 * 1000);
-
-    const duplicateCheck = query(
+    // Check 1: Does the same USER already have an appointment at this time?
+    const userDuplicateCheck = query(
       collection(db, 'appointments'),
       where('userId', '==', appointmentData.userId),
       where('barberId', '==', appointmentData.barberId),
-      where('date', '>=', Timestamp.fromDate(twoMinutesBefore)),
-      where('date', '<=', Timestamp.fromDate(twoMinutesAfter)),
       where('status', 'in', ['confirmed', 'pending'])
     );
 
-    const duplicates = await getDocs(duplicateCheck);
+    const userDuplicates = await getDocs(userDuplicateCheck);
 
-    if (!duplicates.empty) {
-      console.warn('🚫 Duplicate appointment detected - preventing creation');
-      throw new Error('כבר קיים תור בשעה זו. אנא רענן את המסך.');
+    // Check if any of the user's appointments overlap with this one
+    for (const doc of userDuplicates.docs) {
+      const existingAppt = doc.data();
+      const existingStart = existingAppt.date.toDate();
+      const existingDuration = existingAppt.duration || 25;
+      const existingEnd = new Date(existingStart.getTime() + existingDuration * 60 * 1000);
+
+      // Check for any overlap
+      const hasOverlap = asDate < existingEnd && appointmentEnd > existingStart;
+      if (hasOverlap) {
+        console.warn('🚫 User already has an appointment at this time - preventing creation');
+        throw new Error('כבר קיים לך תור בשעה זו. אנא רענן את המסך.');
+      }
+    }
+
+    // Check 2: Is the BARBER already booked at this time? (CRITICAL FIX!)
+    const barberOverlapCheck = query(
+      collection(db, 'appointments'),
+      where('barberId', '==', appointmentData.barberId),
+      where('status', 'in', ['confirmed', 'pending'])
+    );
+
+    const barberAppointments = await getDocs(barberOverlapCheck);
+
+    // Check if any of the barber's appointments overlap with this one
+    for (const doc of barberAppointments.docs) {
+      const existingAppt = doc.data();
+      const existingStart = existingAppt.date.toDate();
+      const existingDuration = existingAppt.duration || 25;
+      const existingEnd = new Date(existingStart.getTime() + existingDuration * 60 * 1000);
+
+      // Check for any overlap
+      const hasOverlap = asDate < existingEnd && appointmentEnd > existingStart;
+      if (hasOverlap) {
+        const existingTime = existingStart.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        console.warn(`🚫 Barber already has an appointment at ${existingTime} - preventing double booking`);
+        throw new Error(`הספר כבר תפוס בשעה ${existingTime}. אנא בחר שעה אחרת.`);
+      }
     }
 
     const appointment = {
@@ -2862,7 +2893,7 @@ export const subscribeToTreatmentsChanges = (callback: (treatments: Treatment[])
   
   const q = query(collection(db, 'treatments'), orderBy('name'));
   
-  return onSnapshot(q, (snapshot) => {
+  return onSnapshot(q, async (snapshot) => {
     console.log('📡 Treatments changed, updating list...');
     
     const treatments: Treatment[] = [];
@@ -2872,6 +2903,10 @@ export const subscribeToTreatmentsChanges = (callback: (treatments: Treatment[])
         ...doc.data()
       } as Treatment);
     });
+    
+    // Update cache with fresh data
+    await CacheUtils.setTreatments(treatments, 60);
+    console.log('💾 Treatments cache updated');
     
     console.log('✅ Updated treatments list:', treatments.length, 'treatments');
     callback(treatments);

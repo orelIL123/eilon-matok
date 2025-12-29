@@ -325,13 +325,12 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
     const earliestMinutes = timeStringToMinutes(sortedSlots[0]);
     const latestMinutes = timeStringToMinutes(sortedSlots[sortedSlots.length - 1]);
 
-    // Start from midnight and check every treatment-duration interval
+    // Start from earliest available slot and check every treatment-duration interval
     // But only add slots where ALL required 5-minute slots are available
-    const startOfDay = 0;
     const endOfDay = 24 * 60;
 
     // Generate all possible start times based on treatment duration
-    for (let minutes = startOfDay; minutes <= latestMinutes && minutes < endOfDay; minutes += treatmentDuration) {
+    for (let minutes = earliestMinutes; minutes <= latestMinutes && minutes < endOfDay; minutes += treatmentDuration) {
       const timeString = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
 
       // Check if this start time AND all slots during the treatment are available

@@ -124,7 +124,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     try {
       const [barbersData, treatmentsData] = await Promise.all([
         getBarbers(),
-        getTreatments()
+        getTreatments(false) // Don't use cache - subscription will handle real-time updates
       ]);
 
       setBarbers(barbersData);
