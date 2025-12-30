@@ -25,6 +25,7 @@ import {
     onSnapshot,
     orderBy,
     query,
+    runTransaction,
     serverTimestamp,
     setDoc,
     Timestamp,
@@ -92,11 +93,11 @@ export const checkCurrentUserAdminStatus = async () => {
     
     console.log(`👤 Current user: ${profile.displayName}`);
     console.log(`👨‍💼 Is admin: ${profile.isAdmin || false}`);
-    console.log(`📱 Has push token: ${!!profile.pushToken}`);
+    console.log(`📱 Has push token: ${!!profile.expoPushToken}`);
     
     return {
       isAdmin: profile.isAdmin || false,
-      hasPushToken: !!profile.pushToken,
+      hasPushToken: !!profile.expoPushToken,
       profile: profile
     };
   } catch (error) {
@@ -153,7 +154,9 @@ export interface UserProfile {
   isAdmin?: boolean;
   hasPassword?: boolean; // Added for phone auth with password
   createdAt: Timestamp;
-  pushToken?: string; // Added for push notifications
+  expoPushToken?: string; // Expo push token for notifications
+  pushToken?: string; // Legacy field (backward compatibility)
+  pushTokenUpdatedAt?: string; // When the push token was last updated
 }
 
 export interface ShopItem {
@@ -1384,20 +1387,20 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
   try {
     // #region agent log
-    if (updates.pushToken) {
-      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1384',message:'updateUserProfile called with pushToken',data:{uid,pushToken:updates.pushToken.substring(0,20)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    if (updates.expoPushToken) {
+      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1384',message:'updateUserProfile called with expoPushToken',data:{uid,expoPushToken:updates.expoPushToken.substring(0,20)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     }
     // #endregion
     const docRef = doc(db, 'users', uid);
     await updateDoc(docRef, updates);
     // #region agent log
-    if (updates.pushToken) {
+    if (updates.expoPushToken) {
       fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1387',message:'updateUserProfile completed',data:{uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     }
     // #endregion
   } catch (error) {
     // #region agent log
-    if (updates.pushToken) {
+    if (updates.expoPushToken) {
       fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:1389',message:'Error updating user profile',data:{uid,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     }
     // #endregion
@@ -1616,38 +1619,13 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       throw new Error(`Duration must be a multiple of ${SLOT_SIZE_MINUTES} minutes. Got: ${appointmentData.duration} minutes`);
     }
 
-    // CRITICAL: Check for overlapping appointments (prevent double-booking)
+    // Parse appointment date for validation
     const appointmentDate = appointmentData.date as any;
     const asDate = typeof appointmentDate?.toDate === 'function' ? appointmentDate.toDate() : new Date(appointmentDate);
-    const treatmentDuration = appointmentData.duration || 25; // Default 25 minutes if not provided
+    const treatmentDuration = appointmentData.duration || 25;
     const appointmentEnd = new Date(asDate.getTime() + treatmentDuration * 60 * 1000);
 
-    // Check 1: Does the same USER already have an appointment at this time?
-    const userDuplicateCheck = query(
-      collection(db, 'appointments'),
-      where('userId', '==', appointmentData.userId),
-      where('barberId', '==', appointmentData.barberId),
-      where('status', 'in', ['confirmed', 'pending'])
-    );
-
-    const userDuplicates = await getDocs(userDuplicateCheck);
-
-    // Check if any of the user's appointments overlap with this one
-    for (const doc of userDuplicates.docs) {
-      const existingAppt = doc.data();
-      const existingStart = existingAppt.date.toDate();
-      const existingDuration = existingAppt.duration || 25;
-      const existingEnd = new Date(existingStart.getTime() + existingDuration * 60 * 1000);
-
-      // Check for any overlap
-      const hasOverlap = asDate < existingEnd && appointmentEnd > existingStart;
-      if (hasOverlap) {
-        console.warn('🚫 User already has an appointment at this time - preventing creation');
-        throw new Error('כבר קיים לך תור בשעה זו. אנא רענן את המסך.');
-      }
-    }
-
-    // Check 2: Is the BARBER already booked at this time? (CRITICAL FIX!)
+    // STEP 1: Check for conflicts BEFORE transaction (fast fail)
     const barberOverlapCheck = query(
       collection(db, 'appointments'),
       where('barberId', '==', appointmentData.barberId),
@@ -1656,9 +1634,8 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
 
     const barberAppointments = await getDocs(barberOverlapCheck);
 
-    // Check if any of the barber's appointments overlap with this one
-    for (const doc of barberAppointments.docs) {
-      const existingAppt = doc.data();
+    for (const docSnapshot of barberAppointments.docs) {
+      const existingAppt = docSnapshot.data();
       const existingStart = existingAppt.date.toDate();
       const existingDuration = existingAppt.duration || 25;
       const existingEnd = new Date(existingStart.getTime() + existingDuration * 60 * 1000);
@@ -1668,16 +1645,63 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       if (hasOverlap) {
         const existingTime = existingStart.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
         console.warn(`🚫 Barber already has an appointment at ${existingTime} - preventing double booking`);
-        throw new Error(`הספר כבר תפוס בשעה ${existingTime}. אנא בחר שעה אחרת.`);
+        throw new Error(`אופס! מישהו תפס את השעה לפני שהספקת! 😅\n\nהספר כבר תפוס ב-${existingTime}. אנא בחר שעה אחרת.`);
       }
     }
 
-    const appointment = {
-      ...appointmentData,
-      createdAt: Timestamp.now()
-    };
+    // STEP 2: Use sentinel document for atomic slot locking!
+    // Create a unique lock key based on barber + date + time (rounded to 5-min slots)
+    const dateStr = asDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const timeStr = `${asDate.getHours().toString().padStart(2, '0')}:${asDate.getMinutes().toString().padStart(2, '0')}`;
+    const slotLockKey = `${appointmentData.barberId}_${dateStr}_${timeStr}`;
+    const slotLockRef = doc(db, 'slotLocks', slotLockKey);
 
-    const docRef = await addDoc(collection(db, 'appointments'), appointment);
+    // CRITICAL: Use Firestore Transaction to prevent race conditions!
+    const docRef = await runTransaction(db, async (transaction) => {
+      // Try to acquire the slot lock (atomic check-and-set)
+      const lockSnapshot = await transaction.get(slotLockRef);
+
+      if (lockSnapshot.exists()) {
+        const lockData = lockSnapshot.data();
+
+        // Check if there's an appointmentId (meaning slot is actually booked)
+        if (lockData.appointmentId) {
+          console.warn('🚫 Slot already has an appointment:', lockData.appointmentId);
+          throw new Error('אופס! מישהו תפס את השעה לפני שהספקת! 😅\n\nאנא בחר שעה אחרת.');
+        }
+
+        // Check if lock is still active (pending booking)
+        const lockExpiry = lockData.expiresAt?.toDate() || new Date(0);
+        const now = new Date();
+        if (lockExpiry > now) {
+          console.warn('🚫 Slot is locked by another booking attempt');
+          throw new Error('אופס! מישהו תפס את השעה לפני שהספקת! 😅\n\nאנא בחר שעה אחרת.');
+        }
+      }
+
+      // Create appointment atomically
+      const appointment = {
+        ...appointmentData,
+        createdAt: Timestamp.now()
+      };
+
+      const newDocRef = doc(collection(db, 'appointments'));
+      transaction.set(newDocRef, appointment);
+
+      // Set permanent lock with appointmentId (this is the actual slot reservation)
+      transaction.set(slotLockRef, {
+        barberId: appointmentData.barberId,
+        date: dateStr,
+        time: timeStr,
+        appointmentId: newDocRef.id,
+        createdAt: Timestamp.now(),
+        // No expiry - this lock is permanent until appointment is cancelled
+      });
+
+      console.log('✅ Appointment created atomically with ID:', newDocRef.id);
+      return newDocRef;
+    });
+
     console.log('Appointment created with ID:', docRef.id);
     
     // Send notification to user about new appointment
@@ -1987,11 +2011,26 @@ export const cancelAppointment = async (appointmentId: string, bypassDeadlineChe
       }
     }
 
-    // Update appointment status to cancelled
+    // Update appointment status to cancelled AND remove slot lock
     await updateDoc(doc(db, 'appointments', appointmentId), {
       status: 'cancelled',
       cancelledAt: Timestamp.now()
     });
+
+    // CRITICAL: Remove the slot lock to free up the time slot
+    try {
+      const appointmentDate = appointmentData.date.toDate();
+      const dateStr = appointmentDate.toISOString().split('T')[0];
+      const timeStr = `${appointmentDate.getHours().toString().padStart(2, '0')}:${appointmentDate.getMinutes().toString().padStart(2, '0')}`;
+      const slotLockKey = `${appointmentData.barberId}_${dateStr}_${timeStr}`;
+      const slotLockRef = doc(db, 'slotLocks', slotLockKey);
+
+      await deleteDoc(slotLockRef);
+      console.log('✅ Slot lock removed for cancelled appointment:', slotLockKey);
+    } catch (lockError) {
+      console.warn('⚠️ Failed to remove slot lock (may not exist):', lockError);
+      // Don't throw - cancellation should succeed even if lock removal fails
+    }
     
     // Send notification to admin about cancellation
     try {
@@ -2112,6 +2151,21 @@ export const deleteAppointment = async (appointmentId: string) => {
         console.log('✅ Waitlist users notified about available slot');
       } catch (waitlistError) {
         console.log('❌ Failed to notify waitlist users:', waitlistError);
+      }
+
+      // CRITICAL: Remove the slot lock to free up the time slot
+      try {
+        const appointmentDate = appointmentData.date.toDate();
+        const dateStr = appointmentDate.toISOString().split('T')[0];
+        const timeStr = `${appointmentDate.getHours().toString().padStart(2, '0')}:${appointmentDate.getMinutes().toString().padStart(2, '0')}`;
+        const slotLockKey = `${appointmentData.barberId}_${dateStr}_${timeStr}`;
+        const slotLockRef = doc(db, 'slotLocks', slotLockKey);
+
+        await deleteDoc(slotLockRef);
+        console.log('✅ Slot lock removed for deleted appointment:', slotLockKey);
+      } catch (lockError) {
+        console.warn('⚠️ Failed to remove slot lock (may not exist):', lockError);
+        // Don't throw - deletion should succeed even if lock removal fails
       }
     }
 
@@ -3845,7 +3899,7 @@ export const registerForPushNotifications = async (userId: string) => {
     console.log('📱 Push token:', token);
 
     // Save token to user profile
-    await updateUserProfile(userId, { pushToken: token });
+    await updateUserProfile(userId, { expoPushToken: token });
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3634',message:'Push token saved to profile',data:{userId,token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
@@ -3900,12 +3954,22 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
 export const sendNotificationToUser = async (userId: string, title: string, body: string, data?: any) => {
   try {
     const userProfile = await getUserProfile(userId);
-    if (!userProfile || !userProfile.pushToken) {
-      console.log('❌ User not found or no push token');
+    const token = userProfile?.expoPushToken || userProfile?.pushToken;
+    if (!userProfile || !token) {
+      console.log('❌ User not found or no push token (expoPushToken/pushToken)');
       return false;
     }
 
-    await sendPushNotification(userProfile.pushToken, title, body, data);
+    // Opportunistic migration: if user has legacy pushToken but no expoPushToken, copy it over
+    try {
+      if (!userProfile.expoPushToken && userProfile.pushToken) {
+        await updateUserProfile(userId, { expoPushToken: userProfile.pushToken });
+      }
+    } catch (e) {
+      // Don't fail send if migration fails
+    }
+
+    await sendPushNotification(token, title, body, data);
     return true;
   } catch (error) {
     console.error('Error sending notification to user:', error);
@@ -3978,15 +4042,16 @@ export const sendNotificationToAllUsers = async (title: string, body: string, da
     await Promise.allSettled(notificationPromises);
     console.log(`✅ Created ${nonAdminUsers.length} in-app notifications`);
 
-    // Send push notifications only to users with push tokens
-    const usersWithTokens = nonAdminUsers.filter(user => user.pushToken);
+    // Send push notifications only to users with push tokens (support legacy pushToken too)
+    const usersWithTokens = nonAdminUsers.filter(user => user.expoPushToken || user.pushToken);
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3752',message:'Users with push tokens found',data:{totalUsers:nonAdminUsers.length,usersWithTokens:usersWithTokens.length,userIds:usersWithTokens.map(u=>u.uid)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
     // #endregion
     const pushResults = await Promise.allSettled(
-      usersWithTokens.map(user =>
-        sendPushNotification(user.pushToken!, title, body, data)
-      )
+      usersWithTokens.map(user => {
+        const token = user.expoPushToken || user.pushToken;
+        return token ? sendPushNotification(token, title, body, data) : Promise.resolve();
+      })
     );
 
     const successfulPush = pushResults.filter(result => result.status === 'fulfilled').length;
@@ -4048,22 +4113,6 @@ export const scheduleAppointmentReminders = async (appointmentId: string, appoin
     // Get admin settings to check reminder timings
     const adminSettings = await getAdminNotificationSettings();
     console.log('🔧 Admin reminder settings:', adminSettings.reminderTimings);
-    
-    // Schedule 24-hour reminder if appointment is more than 24 hours away
-    if (hoursUntilAppointment > 24) {
-      const reminder24hTime = new Date(appointmentDate.getTime() - 24 * 60 * 60 * 1000);
-      console.log(`📅 Scheduling 24h reminder for ${reminder24hTime.toLocaleString('he-IL')}`);
-      
-      // Store scheduled reminder in Firestore
-      await addDoc(collection(db, 'scheduledReminders'), {
-        appointmentId: appointmentId,
-        userId: appointmentData.userId,
-        scheduledTime: Timestamp.fromDate(reminder24hTime),
-        reminderType: '24h',
-        status: 'pending',
-        createdAt: Timestamp.now()
-      });
-    }
     
     // Schedule 1-hour reminder if appointment is more than 1 hour away AND enabled in settings
     if (hoursUntilAppointment > 1 && adminSettings.reminderTimings.oneHourBefore) {
@@ -4193,22 +4242,11 @@ export const sendAppointmentReminder = async (appointmentId: string) => {
         shouldSend = true;
         console.log('📅 Sending 5-minute reminder to CUSTOMER (push notification)');
       } else if (hoursUntilAppointment <= 1 && minutesUntilAppointment > 5 && adminSettings.reminderTimings.oneHourBefore) {
-        // 1 hour before (only if more than 15 minutes and less than 1 hour)
+        // 1 hour before (only if more than 5 minutes and less than 1 hour)
         title = 'תזכורת לתור! ⏰';
         message = `יש לך תור ל${treatmentName} בעוד שעה ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
         shouldSend = true;
         console.log('📅 Sending 1-hour reminder to CUSTOMER (enabled in settings)');
-      } else if (hoursUntilAppointment <= 24 && hoursUntilAppointment > 1) {
-        // 24 hours before (only if more than 1 hour and less than 24 hours)
-        title = 'תזכורת לתור! ⏰';
-        const isTomorrow = appointmentDate.getDate() === new Date(now.getTime() + 24 * 60 * 60 * 1000).getDate();
-        if (isTomorrow) {
-          message = `התור שלך מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-        } else {
-          message = `התור שלך ב-${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-        }
-        shouldSend = true;
-        console.log('📅 Sending 24-hour reminder to CUSTOMER');
       } else if (minutesUntilAppointment <= 0 && minutesUntilAppointment > -60 && adminSettings.reminderTimings.whenStarting) {
         // When starting (within 1 hour after appointment time)
         title = 'התור שלך מתחיל! 🎯';
@@ -4448,9 +4486,9 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
     
     if (currentUser) {
       const currentUserProfile = await getUserProfile(currentUser.uid);
-      if (currentUserProfile?.isAdmin && currentUserProfile?.pushToken) {
+      if (currentUserProfile?.isAdmin && (currentUserProfile?.expoPushToken || currentUserProfile?.pushToken)) {
         adminUsers.push(currentUserProfile);
-        console.log(`👨‍💼 Current user is admin with push token: ${currentUserProfile.displayName}`);
+        console.log(`👨‍💼 Current user is admin with expoPushToken: ${currentUserProfile.displayName}`);
       }
     }
     
@@ -4458,7 +4496,7 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
     try {
       const users = await getAllUsers();
       console.log(`👥 Total users found: ${users.length}`);
-      const allAdminUsers = users.filter(user => user.isAdmin && user.pushToken);
+      const allAdminUsers = users.filter(user => user.isAdmin && (user.expoPushToken || user.pushToken));
       // Merge without duplicates
       allAdminUsers.forEach(user => {
         if (!adminUsers.find(existing => existing.uid === user.uid)) {
@@ -4483,7 +4521,9 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
       adminUsers.map(async (user) => {
         try {
           console.log(`📱 Sending to admin: ${user.displayName} (${user.uid})`);
-          return await sendPushNotification(user.pushToken!, title, body, data);
+          const token = user.expoPushToken || user.pushToken;
+          if (!token) throw new Error('No push token (expoPushToken/pushToken)');
+          return await sendPushNotification(token, title, body, data);
         } catch (error) {
           console.error(`❌ Failed to send to admin ${user.displayName}:`, error);
           throw error;
@@ -4682,14 +4722,15 @@ export const sendWelcomeNotification = async (userId: string) => {
 export const sendPromotionalNotification = async (title: string, body: string, data?: any) => {
   try {
     const users = await getAllUsers();
-    const usersWithTokens = users.filter(user => user.pushToken && !user.isAdmin); // Don't send to admins
+    const usersWithTokens = users.filter(user => (user.expoPushToken || user.pushToken) && !user.isAdmin); // Don't send to admins
     
     console.log(`📱 Sending promotional notification to ${usersWithTokens.length} users`);
-    
+
     const results = await Promise.allSettled(
-      usersWithTokens.map(user => 
-        sendPushNotification(user.pushToken!, title, body, data)
-      )
+      usersWithTokens.map(user => {
+        const token = user.expoPushToken || user.pushToken;
+        return token ? sendPushNotification(token, title, body, data) : Promise.resolve();
+      })
     );
     
     const successful = results.filter(result => result.status === 'fulfilled').length;

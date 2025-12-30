@@ -186,11 +186,12 @@ export const processScheduledReminders = functions.pubsub
             }
             
             const userData = userDoc.data()!;
-            const pushToken = userData.pushToken;
+            // Backward compatibility: some users still have legacy "pushToken"
+            const pushToken = userData.expoPushToken || userData.pushToken;
             
             if (!pushToken) {
-              console.log(`⚠️ User ${userId} has no push token, skipping reminder`);
-              await reminderDoc.ref.update({ status: 'failed', error: 'No push token' });
+              console.log(`⚠️ User ${userId} has no push token (expoPushToken/pushToken), skipping reminder`);
+              await reminderDoc.ref.update({ status: 'failed', error: 'No push token (expoPushToken/pushToken)' });
               return;
             }
             
@@ -214,20 +215,12 @@ export const processScheduledReminders = functions.pubsub
             let title = '';
             let message = '';
             
-            if (minutesUntilAppointment <= 15 && minutesUntilAppointment > 0 && hoursUntilAppointment < 1) {
+            if (minutesUntilAppointment <= 5 && minutesUntilAppointment > 0 && hoursUntilAppointment < 1) {
               title = 'תזכורת לתור! ⏰';
-              message = `התור שלך בעוד 15 דקות ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-            } else if (hoursUntilAppointment <= 1 && minutesUntilAppointment > 15) {
+              message = `התור שלך בעוד 5 דקות ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+            } else if (hoursUntilAppointment <= 1 && minutesUntilAppointment > 5) {
               title = 'תזכורת לתור! ⏰';
               message = `יש לך תור ל${treatmentName} בעוד שעה ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-            } else if (hoursUntilAppointment <= 24 && hoursUntilAppointment > 1) {
-              const isTomorrow = appointmentDate.toDateString() === new Date(currentTime.getTime() + 24 * 60 * 60 * 1000).toDateString();
-              title = 'תזכורת לתור! 📅';
-              if (isTomorrow) {
-                message = `התור שלך מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-              } else {
-                message = `התור שלך ב-${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
-              }
             } else if (minutesUntilAppointment <= 0 && minutesUntilAppointment > -60) {
               title = 'התור שלך מתחיל! 🎯';
               message = `התור שלך ל${treatmentName} מתחיל עכשיו!`;

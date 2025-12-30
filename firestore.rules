@@ -155,6 +155,13 @@ service cloud.firestore {
       allow update: if isAdmin() || isSignedIn(); // Admins can update all fields, users can only dismiss (update dismissedBy)
       allow delete: if isAdmin(); // Only admins can delete
     }
+
+    // Slot Locks (for preventing double-booking race conditions)
+    match /slotLocks/{lockId} {
+      // Allow any signed-in user to read and write slot locks
+      // This is necessary for the atomic booking transaction
+      allow read, write: if isSignedIn();
+    }
   }
 }
 

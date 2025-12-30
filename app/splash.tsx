@@ -18,6 +18,10 @@ export default function SplashScreen() {
       // Ignore errors if splash is already hidden
     });
 
+    // Track start time to ensure minimum 2 seconds display
+    const startTime = Date.now();
+    const MINIMUM_DISPLAY_TIME = 2000; // 2 seconds
+
     // Check auth state using the new AuthManager
     let authStateChecked = false;
 
@@ -45,17 +49,35 @@ export default function SplashScreen() {
         // First: Check if already authenticated via Firebase persistence
         const isAuthenticated = await authManager.isAuthenticated();
 
+        // Ensure minimum display time of 2 seconds
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MINIMUM_DISPLAY_TIME - elapsedTime);
+
+        const navigate = (route: '/(tabs)' | '/auth-choice') => {
+          if (remainingTime > 0) {
+            setTimeout(() => {
+              Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start(() => {
+                router.replace(route);
+              });
+            }, remainingTime);
+          } else {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              router.replace(route);
+            });
+          }
+        };
+
         if (isAuthenticated) {
           console.log('✅ SplashScreen: User already authenticated via Firebase persistence');
-
-          // Fade out and navigate to home
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            router.replace('/(tabs)');
-          });
+          navigate('/(tabs)');
           return;
         }
 
@@ -63,36 +85,44 @@ export default function SplashScreen() {
         console.log('🔍 SplashScreen: No Firebase auth, trying auto-login...');
         const autoLoginSuccess = await authManager.attemptAutoLogin();
 
-        // Fade out before navigation
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
-          if (autoLoginSuccess) {
-            console.log('✅ SplashScreen: Auto-login successful, navigating to home');
-            router.replace('/(tabs)');
-          } else {
-            console.log('❌ SplashScreen: No auto-login possible, navigating to auth choice');
-            router.replace('/auth-choice');
-          }
-        });
+        if (autoLoginSuccess) {
+          console.log('✅ SplashScreen: Auto-login successful, navigating to home');
+          navigate('/(tabs)');
+        } else {
+          console.log('❌ SplashScreen: No auto-login possible, navigating to auth choice');
+          navigate('/auth-choice');
+        }
 
       } catch (error) {
         console.error('❌ SplashScreen: Error in auth check:', error);
 
-        // Fallback to auth choice on error
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
-          router.replace('/auth-choice');
-        });
+        // Ensure minimum display time even on error
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MINIMUM_DISPLAY_TIME - elapsedTime);
+
+        if (remainingTime > 0) {
+          setTimeout(() => {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              router.replace('/auth-choice');
+            });
+          }, remainingTime);
+        } else {
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            router.replace('/auth-choice');
+          });
+        }
       }
     };
 
-    // Start auth check immediately (no delay needed since native splash is already showing)
+    // Start auth check immediately (minimum display time will be enforced)
     checkAuthState();
   }, []);
 

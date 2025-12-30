@@ -4,35 +4,37 @@
  */
 
 // Global slot size in minutes - all scheduling is based on this grid
-// Changed to 5 minutes to support flexible treatment durations (10, 15, 20, 25, 30, etc.)
-export const SLOT_SIZE_MINUTES = 5;
+// Changed to 25 minutes to match standard treatment duration
+export const SLOT_SIZE_MINUTES = 25;
 
-// Time grid points (in minutes from start of hour) - every 5 minutes
-// This allows fine-grained scheduling while keeping availability management simple
-export const TIME_GRID_POINTS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]; // Every 5 minutes
+// Time grid points (in minutes from start of hour) - every 25 minutes
+// This matches the standard treatment duration
+// Starting offset: 15 minutes (so grid is 7:15, 7:40, 8:05, 8:30... → 16:25)
+export const TIME_GRID_POINTS = [15, 40]; // Every 25 minutes starting from :15 (:15, :40)
+export const GRID_START_OFFSET = 15; // Grid starts at X:15 instead of X:00
 
-// Helper function to snap time to the nearest 5-minute grid point
+// Helper function to snap time to the nearest 25-minute grid point
 export const snapToGrid = (date: Date): Date => {
   const minutes = date.getMinutes();
   const hours = date.getHours();
-  
-  // Find the closest 5-minute grid point
-  const snappedMinutes = Math.round(minutes / 5) * 5;
-  
+
+  // Find the closest 25-minute grid point (0, 25, 50)
+  const snappedMinutes = Math.round(minutes / 25) * 25;
+
   const snappedDate = new Date(date);
   if (snappedMinutes >= 60) {
     snappedDate.setHours(hours + 1, 0, 0, 0);
   } else {
     snappedDate.setMinutes(snappedMinutes, 0, 0);
   }
-  
+
   return snappedDate;
 };
 
-// Helper function to check if a duration is valid (multiple of 5 minutes, minimum 5)
-// This allows flexible treatment durations: 5, 10, 15, 20, 25, 30, etc.
+// Helper function to check if a duration is valid (multiple of 25 minutes, minimum 25)
+// This ensures treatments align with the slot grid
 export const isValidDuration = (durationMinutes: number): boolean => {
-  return durationMinutes >= 5 && durationMinutes % SLOT_SIZE_MINUTES === 0;
+  return durationMinutes >= 25 && durationMinutes % SLOT_SIZE_MINUTES === 0;
 };
 
 // Helper function to get the number of slots needed for a duration
@@ -46,10 +48,22 @@ export const generateTimeSlots = (startHour: number, endHour: number): string[] 
   const dayStartMinutes = startHour * 60;
   const dayEndMinutes = endHour * 60;
   
-  // Find the first slot boundary at or after startHour
-  const firstSlotMinutes = Math.ceil(dayStartMinutes / SLOT_SIZE_MINUTES) * SLOT_SIZE_MINUTES;
+  // CRITICAL: Grid starts at 7:15 (435 minutes) to align with 16:25
+  // Grid pattern: 7:15, 7:40, 8:05, 8:30, 8:55... 16:25, 16:50...
+  // All grid times have the property: minutes % 25 = 10
+  const BASE_GRID_START = 7 * 60 + 15; // 7:15 = 435 minutes
   
-  // Generate continuous slot increments (no hour jumps)
+  // Find first slot at or after dayStartMinutes
+  let firstSlotMinutes;
+  if (dayStartMinutes <= BASE_GRID_START) {
+    firstSlotMinutes = BASE_GRID_START;
+  } else {
+    // Calculate how many slots have passed since BASE_GRID_START
+    const slotsPassed = Math.ceil((dayStartMinutes - BASE_GRID_START) / SLOT_SIZE_MINUTES);
+    firstSlotMinutes = BASE_GRID_START + (slotsPassed * SLOT_SIZE_MINUTES);
+  }
+  
+  // Generate continuous slot increments
   for (let currentMinutes = firstSlotMinutes; currentMinutes < dayEndMinutes; currentMinutes += SLOT_SIZE_MINUTES) {
     const hours = Math.floor(currentMinutes / 60);
     const minutes = currentMinutes % 60;
@@ -73,11 +87,14 @@ export const minutesToTimeString = (minutes: number): string => {
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 };
 
-// Helper function to check if a time string is on the grid (5-minute intervals)
+// Helper function to check if a time string is on the grid (25-minute intervals starting from 7:15)
 export const isOnGrid = (timeString: string): boolean => {
   const totalMinutes = timeStringToMinutes(timeString);
-  // Check if the time is on a 5-minute slot boundary from midnight
-  return totalMinutes % SLOT_SIZE_MINUTES === 0;
+  // Grid starts at 7:15 (435 minutes) and advances in 25-minute steps
+  // Pattern: 435, 460, 485, 510, 535, 560, 585, 610, 635... 985 (16:25)
+  // All these numbers have the same remainder when divided by 25: 435%25=10, 460%25=10, 985%25=10
+  // So check: totalMinutes % 25 === 10
+  return totalMinutes % SLOT_SIZE_MINUTES === 10;
 };
 
 // Helper function to get next grid point

@@ -2,7 +2,9 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    Alert,
     Dimensions,
+    Linking,
     Modal,
     SafeAreaView,
     ScrollView,
@@ -12,6 +14,7 @@ import {
     View,
 } from 'react-native';
 import { checkIsAdmin, getCurrentUser } from '../../services/firebase';
+import { checkPermissions } from '../../services/notifications';
 import { changeLanguage } from '../i18n';
 
 const { width } = Dimensions.get('window');
@@ -28,6 +31,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(true);
   
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -40,8 +44,14 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
       }
     };
     
+    const checkNotificationPermission = async () => {
+      const hasPermission = await checkPermissions();
+      setHasNotificationPermission(hasPermission);
+    };
+    
     if (visible) {
       checkAdminStatus();
+      checkNotificationPermission();
     }
   }, [visible]);
   
@@ -60,6 +70,27 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
     } catch (error) {
       console.error('Error changing language:', error);
     }
+  };
+
+  const handleOpenSettings = () => {
+    Alert.alert(
+      'הפעלת התראות 🔔',
+      'כדי לקבל תזכורות לתורים, יש להפעיל התראות בהגדרות המכשיר.\n\nהאם לפתוח את ההגדרות?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'פתח הגדרות',
+          onPress: () => {
+            onClose();
+            setTimeout(() => {
+              Linking.openSettings().catch(() => {
+                Alert.alert('שגיאה', 'לא ניתן לפתוח את ההגדרות');
+              });
+            }, 300);
+          }
+        }
+      ]
+    );
   };
 
   const handleNotificationPress = () => {
@@ -103,6 +134,30 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
+          
+          {/* Notification Permission Banner */}
+          {!hasNotificationPermission && (
+            <TouchableOpacity 
+              style={styles.notificationBanner}
+              onPress={handleOpenSettings}
+              activeOpacity={0.7}
+            >
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerIcon}>
+                  <Ionicons name="notifications-off" size={24} color="#FFA500" />
+                </View>
+                <View style={styles.bannerText}>
+                  <Text style={styles.bannerTitle}>התראות כבויות 🔔</Text>
+                  <Text style={styles.bannerSubtitle}>
+                    לא תקבל תזכורות לתורים - לחץ להפעלה
+                  </Text>
+                </View>
+                <View style={styles.bannerArrow}>
+                  <Ionicons name="chevron-forward" size={20} color="#FFA500" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
           
           <ScrollView style={styles.menuContent}>
             {menuItems.map((item) => (
@@ -287,6 +342,41 @@ const styles = StyleSheet.create({
   activeLanguageText: {
     color: '#8B4513',
     fontWeight: '600',
+  },
+  notificationBanner: {
+    backgroundColor: 'rgba(255, 165, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 165, 0, 0.3)',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 16,
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bannerIcon: {
+    marginLeft: 12,
+  },
+  bannerText: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  bannerArrow: {
+    marginRight: 0,
+  },
+  bannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFA500',
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  bannerSubtitle: {
+    fontSize: 13,
+    color: '#FFD700',
+    textAlign: 'right',
   },
 });
 

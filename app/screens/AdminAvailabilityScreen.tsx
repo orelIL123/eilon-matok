@@ -83,9 +83,9 @@ const generateNext14Days = () => {
   return days;
 };
 
-// Simple time slots from 07:00 to 24:00 in slot increments (5 minutes)
+// Simple time slots from 07:15 to 24:00 in 25-minute increments
 const getTimeSlots = () => {
-  return generateTimeSlots(7, 24); // 7:00 → 24:00 (exclusive) = 07:00, 07:05, 07:10, 07:15, ... 23:55
+  return generateTimeSlots(7, 24); // 7:00 → 24:00 (exclusive) = 07:15, 07:40, 08:05, 08:30, ... 23:40
 };
 
 // Helper: for TODAY, prevent enabling past slots
@@ -494,8 +494,8 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
       const barberId = selectedBarber.id;
 
       if (newAvailability) {
-        // If making available, set default 9:00-17:00 schedule with slot-based slots
-        const defaultSlots = generateTimeSlots(9, 17);
+        // If making available, set default 16:25-22:05 schedule (Eilon's working hours)
+        const defaultSlots = generateTimeSlots(16, 23); // 16:00-23:00 → will give us 16:25, 16:50... 22:40
         console.log('✅ Creating default slots for SPECIFIC DATE ONLY:', date, defaultSlots);
 
         const dayOfWeek = getDayOfWeekFromYMD(date);
@@ -504,8 +504,8 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
           barberId,
           date, // SPECIFIC DATE - only this date!
           dayOfWeek, // Keep for reference
-          startTime: '09:00',
-          endTime: '17:00',
+          startTime: '16:25',
+          endTime: '22:05',
           availableSlots: defaultSlots, // Save exact slots
           isAvailable: true,
           createdAt: new Date()
@@ -523,7 +523,7 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
         await setDoc(doc(collection(db, 'dailyAvailability')), docData);
         console.log('💾 Saved availability for SPECIFIC DATE ONLY (no weekly update):', docData);
 
-        showToast('יום הופעל עם שעות ברירת מחדל (09:00-17:00)', 'success');
+        showToast('יום הופעל עם שעות ברירת מחדל (16:25-22:05)', 'success');
       } else {
         // If making unavailable, CREATE a record with isAvailable: false
         // This explicitly marks the day as unavailable and overrides weekly availability
@@ -915,7 +915,7 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
                 שליטה מלאה על זמינות {selectedBarber?.name}
               </Text>
               <Text style={styles.subInstructionText}>
-                כל סלוט הוא 5 דקות. ברירת מחדל: ימי שישי ושבת לא זמינים, שעות 09:00-17:00 כשמפעילים יום.
+                כל סלוט הוא 25 דקות. ברירת מחדל: ימי שישי ושבת לא זמינים, שעות 16:25-22:05 כשמפעילים יום.
               </Text>
               <Text style={styles.rangeInstructionText}>
                 💡 לחץ ארוך על סלוט התחלה ואז לחץ על סלוט סיום - כדי לבחור טווח שלם!

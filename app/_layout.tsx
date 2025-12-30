@@ -12,7 +12,7 @@ import { Alert, AppState, AppStateStatus, View } from 'react-native';
 import 'react-native-reanimated';
 import '../app/globals.css';
 import { auth } from '../config/firebase';
-import { ensureAndroidChannel } from '../services/notifications';
+import { checkPermissions, ensureAndroidChannel, registerPushTokenForUser } from '../services/notifications';
 import AppAuthGate from './components/AppAuthGate';
 import i18n from './i18n';
 
@@ -38,6 +38,7 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const lastPushSyncAtRef = useRef<number>(0);
 
   // Setup notification response handler (auth-aware)
   useEffect(() => {
@@ -84,6 +85,9 @@ export default function RootLayout() {
 
   // Note: Push token registration is now only done when user explicitly enables notifications
   // via settings or onboarding flow, not automatically on login
+  //
+  // HOWEVER: if a user previously denied notifications and later enables them in device settings,
+  // we still need to register the token. We do this opportunistically on app foreground.
 
   // Check for updates on app start and auto-fetch in background
   useEffect(() => {
@@ -144,6 +148,27 @@ export default function RootLayout() {
       if (nextAppState === 'active') {
         console.log('🔄 App came to foreground, checking for updates...');
         checkAndFetchUpdates();
+
+        // Opportunistically sync push token if permissions are now granted
+        // (common case: user enabled notifications in iOS/Android settings)
+        (async () => {
+          try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
+
+            // Throttle to avoid spamming Firestore on frequent foreground events
+            const now = Date.now();
+            if (now - lastPushSyncAtRef.current < 60_000) return; // 60s
+            lastPushSyncAtRef.current = now;
+
+            const hasPerm = await checkPermissions();
+            if (!hasPerm) return;
+
+            await registerPushTokenForUser(currentUser.uid);
+          } catch (e) {
+            console.log('⚠️ Push token sync skipped/failed:', e);
+          }
+        })();
       }
     });
 

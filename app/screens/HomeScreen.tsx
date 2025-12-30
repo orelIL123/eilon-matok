@@ -511,10 +511,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     });
   };
 
-  // Address coordinates - באר שבע
-  const BUSINESS_ADDRESS = 'באר שבע, ישראל';
-  const BUSINESS_LAT = 31.2433; // Be'er Sheva coordinates
-  const BUSINESS_LON = 34.7915;
+  // Address coordinates - אהרון קציר 10, באר שבע
+  const BUSINESS_ADDRESS = 'אהרון קציר 10, באר שבע';
+  const BUSINESS_LAT = 31.271932974328667; // אהרון קציר 10, באר שבע
+  const BUSINESS_LON = 34.81229092468631;
 
   const handleNavigate = () => {
     // For iOS, show ActionSheet with all options

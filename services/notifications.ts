@@ -10,9 +10,17 @@
 
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { deleteField, doc, updateDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { db } from '../config/firebase';
+
+// Expo project ID used to generate valid Expo push tokens for this app.
+// Prefer config values, fallback to hardcoded projectId from app.json.
+const EXPO_PROJECT_ID =
+  (Constants?.expoConfig as any)?.extra?.eas?.projectId ||
+  (Constants as any)?.easConfig?.projectId ||
+  '518e7344-df67-42cd-8107-502bd3e48357';
 
 // ============================================================================
 // TYPES
@@ -152,7 +160,7 @@ export async function registerPushTokenForUser(uid: string): Promise<void> {
 
     // Get the Expo push token
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: '229bec8c-f551-41b7-8e6b-e8e26fb31945',
+      projectId: EXPO_PROJECT_ID,
     });
     const token = tokenData.data;
 
@@ -162,6 +170,8 @@ export async function registerPushTokenForUser(uid: string): Promise<void> {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       expoPushToken: token,
+      // Backward compatibility with older app versions / server code
+      pushToken: token,
       pushTokenUpdatedAt: new Date().toISOString(),
     });
 
@@ -184,6 +194,7 @@ export async function revokePushTokenForUser(uid: string): Promise<void> {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       expoPushToken: deleteField(),
+      pushToken: deleteField(),
       pushTokenUpdatedAt: deleteField(),
     });
 
@@ -353,30 +364,12 @@ export async function scheduleAppointmentReminders(appointment: AppointmentRemin
     }
 
     // Calculate reminder times
-    const t24h = new Date(appointmentTime.getTime() - 24 * 60 * 60 * 1000);
     const t1h = new Date(appointmentTime.getTime() - 1 * 60 * 60 * 1000);
     const t5m = new Date(appointmentTime.getTime() - 5 * 60 * 1000);
     const tAt = appointmentTime;
 
     // Build reminder specifications based on admin settings
     const specs: ReminderSpec[] = [];
-
-    // T-24h reminder (if enabled by admin)
-    if (adminSettings.customerReminderSettings?.t24hEnabled !== false) {
-      specs.push({
-        id: `${appointment.id}:T_MINUS_24H`,
-        when: t24h,
-        title: '💈 תזכורת לתור',
-        body: `התור שלך מחר ב-${appointmentTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
-        data: {
-          appointmentId: appointment.id,
-          kind: 'T_MINUS_24H',
-          type: 'appointment-reminder',
-        },
-      });
-    } else {
-      console.log('🔕 T-24h reminder disabled by admin');
-    }
 
     // T-1h reminder (if enabled by admin)
     if (adminSettings.customerReminderSettings?.t1hEnabled !== false) {

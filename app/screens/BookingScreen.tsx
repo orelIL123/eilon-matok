@@ -336,6 +336,37 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     }
   }, [selectedBarber, selectedDate, selectedTreatment]);
 
+  // Listen to appointments changes in real-time (for immediate slot updates on cancellations)
+  useEffect(() => {
+    if (selectedBarber && selectedDate && selectedTreatment) {
+      console.log('🔔 Setting up appointments listener for barber:', selectedBarber.id);
+
+      const db = getFirestore();
+
+      // Listen to all appointments for this barber
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
+        where('barberId', '==', selectedBarber.id),
+        where('status', 'in', ['confirmed', 'pending'])
+      );
+
+      const unsubscribe = onSnapshot(appointmentsQuery, async (snapshot: QuerySnapshot) => {
+        console.log('📡 Appointments updated! Processing', snapshot.docs.length, 'appointments');
+
+        // Regenerate available times for the selected date
+        const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
+        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        console.log('🔄 Real-time appointments: Updated available times:', timeStrings.length, 'slots');
+        setAvailableTimes(timeStrings);
+      });
+
+      return () => {
+        console.log('🔕 Unsubscribing from appointments changes');
+        unsubscribe();
+      };
+    }
+  }, [selectedBarber, selectedDate, selectedTreatment]);
+
   // Listen to treatments changes in real-time
   useEffect(() => {
     console.log('🔔 Setting up treatments listener');
@@ -487,8 +518,9 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         return [];
       }
 
-      // Generate slot candidates at intervals matching the treatment duration
-      // These are times like 9:00, 9:30, 10:00 for 30-min treatments
+      // FIXED: Generate slot candidates starting from ACTUAL availability start
+      // Steps forward by treatment duration (not 5-min intervals)
+      // Example: availability 14:05-15:40, treatment 25min → [14:05, 14:30, 14:55, 15:20]
       const slotCandidates: string[] = [];
 
       // Find the earliest and latest available times
@@ -496,27 +528,39 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       const earliestMinutes = toMin(sortedSlots[0]);
       const latestMinutes = toMin(sortedSlots[sortedSlots.length - 1]);
 
-      // Start from the earliest available time, rounded down to nearest treatment interval
-      // For 30-min: if first slot is 9:05, we start checking from 9:00
-      const startHour = Math.floor(earliestMinutes / 60);
-      const firstIntervalMinutes = startHour * 60;
+      // Align start to grid (grid starts at 7:15 = 435 minutes)
+      // Grid pattern: 7:15, 7:40, 8:05, 8:30, 8:55... 16:25, 16:50...
+      const BASE_GRID_START = 7 * 60 + 15; // 7:15 = 435 minutes
+      let alignedStart;
+      if (earliestMinutes <= BASE_GRID_START) {
+        alignedStart = BASE_GRID_START;
+      } else {
+        // Calculate how many slots have passed since BASE_GRID_START
+        const slotsPassed = Math.ceil((earliestMinutes - BASE_GRID_START) / SLOT_SIZE_MINUTES);
+        alignedStart = BASE_GRID_START + (slotsPassed * SLOT_SIZE_MINUTES);
+      }
 
-      // Generate all possible start times based on treatment duration
-      for (let minutes = firstIntervalMinutes; minutes <= latestMinutes; minutes += treatmentDuration) {
-        const timeString = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
+      // Generate candidate start times by stepping forward in treatment duration increments
+      // A candidate is valid only if (start + duration) fits COMPLETELY within availability
+      // CRITICAL: Treatment must END at or before the last available slot
+      for (let t = alignedStart; t + treatmentDuration <= latestMinutes + SLOT_SIZE_MINUTES; t += treatmentDuration) {
+        const timeString = `${Math.floor(t / 60).toString().padStart(2, '0')}:${(t % 60).toString().padStart(2, '0')}`;
 
         // Check if this start time AND all slots during the treatment are available
+        // This ensures the ENTIRE treatment duration has available slots
         let allSlotsAvailable = true;
-        for (let checkMinutes = minutes; checkMinutes < minutes + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
+        for (let checkMinutes = t; checkMinutes < t + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
           const checkTime = `${Math.floor(checkMinutes / 60).toString().padStart(2, '0')}:${(checkMinutes % 60).toString().padStart(2, '0')}`;
           if (!availableTimeSlots.includes(checkTime)) {
             allSlotsAvailable = false;
+            console.log(`❌ Slot ${timeString} rejected: missing ${checkTime} (treatment needs ${treatmentDuration}min)`);
             break;
           }
         }
 
         if (allSlotsAvailable) {
           slotCandidates.push(timeString);
+          console.log(`✅ Slot ${timeString} accepted (ends at ${Math.floor((t + treatmentDuration) / 60)}:${((t + treatmentDuration) % 60).toString().padStart(2, '0')})`);
         }
       }
 
@@ -790,9 +834,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       // התזכורות יטופלו על ידי המערכת המרכזית ב-firebase.ts
       // לא צריך לקרוא ל-scheduleAppointmentReminders כאן כי זה יוצר כפילות
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating appointment:', error);
-      Alert.alert(t('common.error'), t('booking.booking_error'));
+      // Show the actual error message from Firebase (e.g., "אופס! מישהו תפס את השעה לפני שהספקת!")
+      const errorMessage = error?.message || t('booking.booking_error');
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setBooking(false);
     }
@@ -1213,25 +1259,27 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
               </View>
             ) : (
               <View style={styles.timesContainer}>
-                {availableTimes.map((time, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.timeCard,
-                      selectedTime === time && styles.selectedCard
-                    ]}
-                    onPress={() => handleTimeSelect(time)}
-                  >
-                    <LinearGradient
-                      colors={['#1a1a1a', '#000000', '#1a1a1a']}
-                      style={styles.timeGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
+                {availableTimes.map((time, index) => {
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.timeCard,
+                        selectedTime === time && styles.selectedCard
+                      ]}
+                      onPress={() => handleTimeSelect(time)}
                     >
-                      <Text style={styles.timeText}>{time}</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ))}
+                      <LinearGradient
+                        colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                        style={styles.timeGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      >
+                        <Text style={styles.timeText}>{time}</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
@@ -1321,7 +1369,15 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 {t('booking.date')} {selectedDate && formatDate(selectedDate)}
               </Text>
               <Text style={styles.confirmationText}>
-                {t('booking.time')} {selectedTime}
+                {t('booking.time')} {selectedTime && selectedTreatment && (() => {
+                  const [hours, minutes] = selectedTime.split(':').map(Number);
+                  const startMinutes = hours * 60 + minutes;
+                  const endMinutes = startMinutes + selectedTreatment.duration;
+                  const endHours = Math.floor(endMinutes / 60);
+                  const endMins = endMinutes % 60;
+                  const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+                  return `${selectedTime} - ${endTime}`;
+                })()}
               </Text>
               <Text style={styles.confirmationPrice}>
                 {t('booking.price', { price: selectedTreatment?.price })}
@@ -1818,15 +1874,45 @@ const styles = StyleSheet.create({
     backdropFilter: 'blur(10px)',
   },
   timeGradient: {
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.15)',
+    minHeight: 60,
   },
   timeText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+    textAlign: 'center',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  timeBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeSlotLabel: {
+    fontSize: 8,
+    color: '#999',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  timeSlotValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  timeSeparator: {
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryContainer: {
     margin: 16,

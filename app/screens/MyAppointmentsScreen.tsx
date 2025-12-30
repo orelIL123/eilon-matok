@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { collection, getFirestore, onSnapshot, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -48,6 +49,42 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Real-time listener for user's appointments
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    console.log('🔔 Setting up real-time listener for user appointments:', user.uid);
+
+    const db = getFirestore();
+    const appointmentsQuery = query(
+      collection(db, 'appointments'),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(appointmentsQuery, async (snapshot) => {
+      console.log('📡 User appointments updated! Processing', snapshot.docs.length, 'appointments');
+
+      const appointmentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Appointment[];
+
+      // Filter out cancelled and deleted appointments
+      const activeAppointments = appointmentsData.filter(apt =>
+        apt.status !== 'cancelled' && apt.status !== 'deleted'
+      );
+
+      console.log('📊 Active appointments:', activeAppointments.length);
+      setAppointments(activeAppointments);
+    });
+
+    return () => {
+      console.log('🔕 Unsubscribing from user appointments');
+      unsubscribe();
+    };
   }, []);
 
   const loadData = async () => {
@@ -185,6 +222,16 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
   };
 
   const handleCancelAppointment = (appointment: Appointment) => {
+    // Check if appointment is already cancelled or deleted
+    if (appointment.status === 'cancelled' || appointment.status === 'deleted') {
+      Alert.alert(
+        'תור מבוטל',
+        'תור זה כבר בוטל על ידי המנהל',
+        [{ text: 'אישור', style: 'default' }]
+      );
+      return;
+    }
+
     if (!canCancelAppointment(appointment)) {
       Alert.alert(
         'לא ניתן לביטול',
@@ -205,11 +252,16 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
           onPress: async () => {
             try {
               await cancelAppointment(appointment.id);
-              await loadData();
+              // No need to reload - real-time listener will update automatically
               showToast('התור בוטל בהצלחה');
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error cancelling appointment:', error);
-              showToast('שגיאה בביטול התור', 'error');
+              // Show better error message
+              if (error?.code === 'permission-denied') {
+                showToast('התור כבר בוטל על ידי המנהל', 'error');
+              } else {
+                showToast('שגיאה בביטול התור', 'error');
+              }
             }
           }
         }

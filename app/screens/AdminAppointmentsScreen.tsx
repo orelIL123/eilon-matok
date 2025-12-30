@@ -289,10 +289,8 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
   };
 
   // Return available slots for the barber on selected date
-  // IMPORTANT: Show slots at intervals matching the treatment duration (like regular booking!)
-  // For 30-min treatment: 9:00, 9:30, 10:00...
-  // For 25-min treatment: 9:00, 9:25, 9:50...
-  // For 15-min treatment: 9:00, 9:15, 9:30...
+  // CRITICAL: Use EXACT same logic as customer booking screen (BookingScreen.tsx)
+  // This ensures admin sees EXACTLY what customer sees
   const generateTimeSlotsForAdmin = () => {
     // If no barber, date, or treatment selected, return empty
     if (!selectedBarber || !selectedDate || !selectedTreatment) {
@@ -317,41 +315,66 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
       return [];
     }
 
-    // Generate slot candidates at intervals matching the treatment duration
-    const slotCandidates: string[] = [];
-
-    // Find the earliest and latest available times
+    // EXACT same logic as BookingScreen - find earliest and latest available times
     const sortedSlots = [...validSlots].sort((a, b) => timeStringToMinutes(a) - timeStringToMinutes(b));
     const earliestMinutes = timeStringToMinutes(sortedSlots[0]);
     const latestMinutes = timeStringToMinutes(sortedSlots[sortedSlots.length - 1]);
 
-    // Start from earliest available slot and check every treatment-duration interval
-    // But only add slots where ALL required 5-minute slots are available
-    const endOfDay = 24 * 60;
+    // Align start to grid (grid starts at 7:15 = 435 minutes)
+    // Grid pattern: 7:15, 7:40, 8:05, 8:30, 8:55... 16:25, 16:50...
+    const BASE_GRID_START = 7 * 60 + 15; // 7:15 = 435 minutes
+    let alignedStart;
+    if (earliestMinutes <= BASE_GRID_START) {
+      alignedStart = BASE_GRID_START;
+    } else {
+      // Calculate how many slots have passed since BASE_GRID_START
+      const slotsPassed = Math.ceil((earliestMinutes - BASE_GRID_START) / SLOT_SIZE_MINUTES);
+      alignedStart = BASE_GRID_START + (slotsPassed * SLOT_SIZE_MINUTES);
+    }
 
-    // Generate all possible start times based on treatment duration
-    for (let minutes = earliestMinutes; minutes <= latestMinutes && minutes < endOfDay; minutes += treatmentDuration) {
-      const timeString = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
+    // Generate candidate start times by stepping forward in treatment duration increments
+    // A candidate is valid only if (start + duration) fits COMPLETELY within availability
+    // CRITICAL: Treatment must END at or before the last available slot
+    const slotCandidates: string[] = [];
+    
+    for (let t = alignedStart; t + treatmentDuration <= latestMinutes + SLOT_SIZE_MINUTES; t += treatmentDuration) {
+      const timeString = `${Math.floor(t / 60).toString().padStart(2, '0')}:${(t % 60).toString().padStart(2, '0')}`;
 
       // Check if this start time AND all slots during the treatment are available
+      // This ensures the ENTIRE treatment duration has available slots
       let allSlotsAvailable = true;
-      for (let checkMinutes = minutes; checkMinutes < minutes + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
+      for (let checkMinutes = t; checkMinutes < t + treatmentDuration; checkMinutes += SLOT_SIZE_MINUTES) {
         const checkTime = `${Math.floor(checkMinutes / 60).toString().padStart(2, '0')}:${(checkMinutes % 60).toString().padStart(2, '0')}`;
         if (!availableSlots.includes(checkTime)) {
           allSlotsAvailable = false;
+          console.log(`❌ Admin slot ${timeString} rejected: missing ${checkTime} (treatment needs ${treatmentDuration}min)`);
           break;
         }
       }
 
       if (allSlotsAvailable) {
         slotCandidates.push(timeString);
+        console.log(`✅ Admin slot ${timeString} accepted (ends at ${Math.floor((t + treatmentDuration) / 60)}:${((t + treatmentDuration) % 60).toString().padStart(2, '0')})`);
       }
     }
 
+    console.log(`📊 Admin slot candidates for ${treatmentDuration}min treatment:`, slotCandidates);
     return slotCandidates;
   };
 
   // Check if a slot is occupied
+  // Check if a time slot has passed (is in the past)
+  const isSlotPassed = (slotTime: string): boolean => {
+    if (!selectedDate) return false;
+
+    const [hour, minute] = slotTime.split(':').map(Number);
+    const slotStart = new Date(selectedDate);
+    slotStart.setHours(hour, minute, 0, 0);
+
+    const now = new Date();
+    return slotStart < now;
+  };
+
   const isSlotOccupied = (slotTime: string): boolean => {
     if (!dayAppointments || dayAppointments.length === 0) return false;
     if (!selectedTreatment) return false;
@@ -519,6 +542,64 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
               setModalVisible(false);
             } catch (error) {
               showToast('שגיאה במחיקת התור', 'error');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAllAppointments = async () => {
+    const appointmentsToDelete = filteredAppointments;
+
+    if (appointmentsToDelete.length === 0) {
+      Alert.alert('שים לב', 'אין תורים למחיקה בסינון הנוכחי');
+      return;
+    }
+
+    const dayDescription = selectedDayFilter
+      ? new Date(selectedDayFilter).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })
+      : 'כל התורים';
+
+    Alert.alert(
+      'מחיקת כל התורים',
+      `האם אתה בטוח שברצונך למחוק ${appointmentsToDelete.length} תורים (${dayDescription})?\n\nפעולה זו תשחרר את כל הסלוטים ולא ניתן לבטלה!`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: `מחק ${appointmentsToDelete.length} תורים`,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              let deleted = 0;
+              let failed = 0;
+
+              // Delete all appointments one by one
+              for (const appointment of appointmentsToDelete) {
+                try {
+                  await deleteAppointment(appointment.id);
+                  deleted++;
+                } catch (error) {
+                  console.error('Failed to delete appointment:', appointment.id, error);
+                  failed++;
+                }
+              }
+
+              // Reload data
+              await loadData();
+              await loadDayAppointments();
+
+              if (failed === 0) {
+                showToast(`✅ ${deleted} תורים נמחקו בהצלחה!`);
+              } else {
+                showToast(`⚠️ נמחקו ${deleted} תורים, ${failed} נכשלו`, 'error');
+              }
+            } catch (error) {
+              console.error('Error deleting all appointments:', error);
+              showToast('שגיאה במחיקת התורים', 'error');
+            } finally {
+              setLoading(false);
             }
           }
         }
@@ -706,6 +787,21 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
             ))}
           </ScrollView>
         </View>
+
+        {/* Delete All Button */}
+        {filteredAppointments.length > 0 && (
+          <View style={styles.deleteAllContainer}>
+            <TouchableOpacity
+              style={styles.deleteAllButton}
+              onPress={handleDeleteAllAppointments}
+            >
+              <Ionicons name="trash-outline" size={18} color="#fff" />
+              <Text style={styles.deleteAllText}>
+                מחק {filteredAppointments.length} תורים {selectedDayFilter ? `(${new Date(selectedDayFilter).toLocaleDateString('he-IL', { weekday: 'short' })})` : '(כל התורים)'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Next Client Button */}
         {actualNextAppointment && (
@@ -1055,32 +1151,42 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeContainer}>
                   {generateTimeSlotsForAdmin().map((time, index) => {
                     const occupied = isSlotOccupied(time);
+                    const passed = isSlotPassed(time);
+                    const disabled = occupied || passed;
+
                     return (
                       <TouchableOpacity
                         key={`time-${time}`}
                         style={[
                           styles.timeButton,
                           selectedTime === time && styles.selectedTimeButton,
-                          occupied && styles.occupiedTimeButton
+                          occupied && styles.occupiedTimeButton,
+                          passed && styles.passedTimeButton
                         ]}
                         onPress={() => {
                           if (occupied) {
                             showToast('⚠️ Slot זה תפוס - בחר שעה אחרת', 'error');
+                          } else if (passed) {
+                            showToast('⚠️ שעה זו כבר עברה', 'error');
                           } else {
                             setSelectedTime(time);
                           }
                         }}
-                        disabled={occupied}
+                        disabled={disabled}
                       >
                         <Text style={[
                           styles.timeButtonText,
                           selectedTime === time && styles.selectedTimeButtonText,
-                          occupied && styles.occupiedTimeButtonText
+                          occupied && styles.occupiedTimeButtonText,
+                          passed && styles.passedTimeButtonText
                         ]}>
                           {time}
                         </Text>
                         {occupied && (
                           <Text style={styles.occupiedBadge}>✕</Text>
+                        )}
+                        {passed && !occupied && (
+                          <Text style={styles.passedBadge}>✕</Text>
                         )}
                       </TouchableOpacity>
                     );
@@ -1287,6 +1393,28 @@ const styles = StyleSheet.create({
   },
   activeFilterButtonText: {
     color: '#fff',
+  },
+  deleteAllContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  deleteAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc3545',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteAllText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -1526,6 +1654,11 @@ const styles = StyleSheet.create({
     borderColor: '#f44336',
     opacity: 0.6,
   },
+  passedTimeButton: {
+    backgroundColor: '#E0E0E0',
+    borderColor: '#999',
+    opacity: 0.5,
+  },
   timeButtonText: {
     fontSize: 14,
     color: '#666',
@@ -1538,11 +1671,29 @@ const styles = StyleSheet.create({
     color: '#f44336',
     textDecorationLine: 'line-through',
   },
+  passedTimeButtonText: {
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
   occupiedBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
     backgroundColor: '#f44336',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  passedBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#999',
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
