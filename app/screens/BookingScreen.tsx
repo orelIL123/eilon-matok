@@ -37,6 +37,13 @@ import { generateTimeSlots, SLOT_SIZE_MINUTES, toMin, toYMD } from '../constants
 
 const { width } = Dimensions.get('window');
 
+// Helper function to format time consistently as HH:MM
+const formatTimeSlot = (date: Date): string => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 interface BookingScreenProps {
   onNavigate: (screen: string) => void;
   onBack?: () => void;
@@ -258,7 +265,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       // If we have a selected date and treatment, update available times
       if (selectedDate && selectedTreatment) {
         const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(slot => formatTimeSlot(slot));
         setAvailableTimes(timeStrings);
       }
 
@@ -322,7 +329,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         if (selectedDate && selectedTreatment) {
           console.log('🔄 Real-time: Regenerating available times for selected date');
           generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration).then(slots => {
-            const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            const timeStrings = slots.map(slot => formatTimeSlot(slot));
             console.log('🔄 Real-time: Updated available times:', timeStrings.length, 'slots');
             setAvailableTimes(timeStrings);
           });
@@ -355,7 +362,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
         // Regenerate available times for the selected date
         const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(slot => formatTimeSlot(slot));
         console.log('🔄 Real-time appointments: Updated available times:', timeStrings.length, 'slots');
         setAvailableTimes(timeStrings);
       });
@@ -663,7 +670,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     // If we already have a selected date, generate times now
     if (selectedDate && selectedBarber) {
       generateAvailableSlots(selectedBarber.id, selectedDate, treatment.duration).then(slots => {
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(slot => formatTimeSlot(slot));
         setAvailableTimes(timeStrings);
       });
     }
@@ -681,7 +688,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     if (selectedBarber && selectedTreatment) {
       try {
         const slots = await generateAvailableSlots(selectedBarber.id, date, selectedTreatment.duration);
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(slot => formatTimeSlot(slot));
         console.log('🎯 DATE SELECTED: Final timeStrings generated:', timeStrings);
 
         // If no slots available, check if barber has availability for this day
@@ -779,9 +786,25 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
     setBooking(true);
     try {
+      // Validate selectedTime format
+      if (!selectedTime || !selectedTime.match(/^\d{2}:\d{2}$/)) {
+        throw new Error('פורמט השעה לא תקין. אנא בחר שעה שוב.');
+      }
+
       const appointmentDateTime = new Date(selectedDate);
       const [hours, minutes] = selectedTime.split(':').map(Number);
+
+      // Validate hours and minutes
+      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        throw new Error('שעה לא תקינה. אנא בחר שעה שוב.');
+      }
+
       appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+      // Validate that the date is valid before proceeding
+      if (isNaN(appointmentDateTime.getTime())) {
+        throw new Error('תאריך לא תקין. אנא נסה שנית.');
+      }
 
       console.log('Creating appointment:', {
         barberId: selectedBarber.id,
@@ -804,7 +827,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         // Refresh available times
         if (selectedBarber && selectedTreatment) {
           const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
-          const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          const timeStrings = slots.map(slot => formatTimeSlot(slot));
           setAvailableTimes(timeStrings);
         }
         return;
