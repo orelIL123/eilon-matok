@@ -27,7 +27,7 @@
         "backgroundColor": "#E8E8E8"
       },
       "edgeToEdgeEnabled": true,
-      "versionCode": 2,
+      "versionCode": 3,
       "package": "com.eilonmatok.app",
       "googleServicesFile": "./app/google-services.json",
       "permissions": [
