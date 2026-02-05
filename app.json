@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.eilonmatok.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "googleServicesFile": "./app/GoogleService-Info.plist",
       "config": {
         "usesNonExemptEncryption": false
