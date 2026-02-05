@@ -5,15 +5,18 @@ import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import 'nativewind';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { Alert, AppState, AppStateStatus, View } from 'react-native';
 import 'react-native-reanimated';
 import '../app/globals.css';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { markNotificationsAsRead } from '../services/firebase';
 import { checkPermissions, ensureAndroidChannel, registerPushTokenForUser } from '../services/notifications';
 import AppAuthGate from './components/AppAuthGate';
+import { NotificationToastProvider, useNotificationToast } from './components/NotificationToastProvider';
 import i18n from './i18n';
 
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -32,24 +35,68 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function RootLayout() {
+function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const { showNotificationToast } = useNotificationToast();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const lastPushSyncAtRef = useRef<number>(0);
+  const lastToastKeyRef = useRef<string | null>(null);
+  const lastToastAtRef = useRef(0);
+  const [currentUid, setCurrentUid] = useState<string | null>(auth.currentUser?.uid ?? null);
 
-  // Setup notification response handler (auth-aware)
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUid(user?.uid ?? null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Setup notification response + foreground handler (auth-aware)
   useEffect(() => {
     console.log('📱 Setting up auth-aware notification handler...');
 
     // Setup Android notification channel
     ensureAndroidChannel();
 
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      const content = notification.request.content;
+      const title = content.title || 'התראה חדשה';
+      const body = content.body || '';
+      const dedupeKey = `${title}|${body}`;
+      const now = Date.now();
+
+      // Prevent double-toasts when a push is also mirrored by Firestore
+      if (lastToastKeyRef.current === dedupeKey && now - lastToastAtRef.current < 5000) {
+        return;
+      }
+      lastToastKeyRef.current = dedupeKey;
+      lastToastAtRef.current = now;
+
+      showNotificationToast({
+        title,
+        message: body,
+        type: 'info',
+        dedupeKey,
+      });
+    });
+
     // Handle notification taps
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       console.log('📱 Notification tapped:', response.notification.request.content.data);
+      const content = response.notification.request.content;
+      const title = content.title || 'התראה';
+      const body = content.body || '';
+      const dedupeKey = `${title}|${body}|tap`;
+
+      showNotificationToast({
+        title,
+        message: body,
+        type: 'info',
+        dedupeKey,
+      });
 
       const data = response.notification.request.content.data as any;
 
@@ -80,8 +127,69 @@ export default function RootLayout() {
 
     return () => {
       subscription.remove();
+      receivedSubscription.remove();
     };
-  }, [router]);
+  }, [router, showNotificationToast]);
+
+  // Show unread in-app notifications once (for users without push or missed pushes)
+  useEffect(() => {
+    if (!currentUid) return;
+
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(
+      notificationsRef,
+      where('userId', '==', currentUid),
+      where('isRead', '==', false),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) return;
+
+      const docs = snapshot.docs.map((doc) => {
+        const data = doc.data() as any;
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        return {
+          id: doc.id,
+          title: data.title || 'התראה',
+          message: data.message || '',
+          createdAt,
+        };
+      });
+
+      docs.sort((a, b) => {
+        const aTime = a.createdAt ? a.createdAt.getTime() : 0;
+        const bTime = b.createdAt ? b.createdAt.getTime() : 0;
+        return bTime - aTime;
+      });
+
+      const latest = docs[0];
+      if (!latest) return;
+
+      const dedupeKey = `${latest.title}|${latest.message}`;
+      const now = Date.now();
+
+      if (lastToastKeyRef.current === dedupeKey && now - lastToastAtRef.current < 5000) {
+        // Still mark all as read so they won't pop again
+        await markNotificationsAsRead(docs.map((item) => item.id));
+        return;
+      }
+
+      lastToastKeyRef.current = dedupeKey;
+      lastToastAtRef.current = now;
+
+      showNotificationToast({
+        title: latest.title,
+        message: latest.message,
+        type: 'broadcast',
+        dedupeKey,
+      });
+
+      await markNotificationsAsRead(docs.map((item) => item.id));
+    });
+
+    return () => unsubscribe();
+  }, [currentUid, showNotificationToast]);
 
   // Note: Push token registration is now only done when user explicitly enables notifications
   // via settings or onboarding flow, not automatically on login
@@ -189,7 +297,7 @@ export default function RootLayout() {
           return; // Not logged in, skip
         }
         
-        const isAdmin = await checkIsAdmin();
+        const isAdmin = await checkIsAdmin(currentUser.uid);
         if (!isAdmin) {
           return; // Not admin, skip - Cloud Functions will handle this
         }
@@ -254,5 +362,13 @@ export default function RootLayout() {
         <StatusBar style="auto" />
       </ThemeProvider>
     </I18nextProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <NotificationToastProvider>
+      <RootLayoutInner />
+    </NotificationToastProvider>
   );
 }

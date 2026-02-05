@@ -21,6 +21,14 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBarber == true;
     }
     
+    function getCurrentUserBarberId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.barberId;
+    }
+    
+    function isBarberButNotAdmin() {
+      return isBarber() && !isAdmin();
+    }
+    
     // Users Collection
     match /users/{userId} {
       // Allow read for signed-in users OR for password reset check (queries only, not direct document access)
@@ -37,7 +45,11 @@ service cloud.firestore {
     // Barbers Collection
     match /barbers/{barberId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Admin can write all, barbers can only update their own profile
+      allow create: if isAdmin();
+      allow update: if isAdmin() || 
+                      (isBarberButNotAdmin() && barberId == getCurrentUserBarberId());
+      allow delete: if isAdmin();
     }
     
     // Treatments Collection
@@ -50,20 +62,20 @@ service cloud.firestore {
     match /appointments/{appointmentId} {
       // Allow reading appointments for:
       // 1. Own appointments (users can see their own)
-      // 2. Barbers can see all their appointments
+      // 2. Barbers can see their own appointments (filtered by barberId)
       // 3. Admins can see everything
       // 4. ANY signed-in user can query appointments by barberId (needed for double-booking prevention)
       //    but can only see limited fields (date, barberId, duration, status) - not personal info
       allow get: if isSignedIn() &&
                     (isOwner(resource.data.userId) ||
-                     isBarber() ||
-                     isAdmin());
+                     isAdmin() ||
+                     (isBarberButNotAdmin() && resource.data.barberId == getCurrentUserBarberId()));
       allow list: if isSignedIn(); // Allow queries for double-booking check
       allow create: if isSignedIn();
       allow update: if isSignedIn() &&
                        (isOwner(resource.data.userId) ||
-                        isBarber() ||
-                        isAdmin());
+                        isAdmin() ||
+                        (isBarberButNotAdmin() && resource.data.barberId == getCurrentUserBarberId()));
       allow delete: if isAdmin();
     }
     
@@ -106,7 +118,13 @@ service cloud.firestore {
     // Daily Availability Collection (per-date schedules)
     match /dailyAvailability/{documentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Admin can write all, barbers can only update their own availability
+      allow create: if isAdmin() || 
+                      (isBarberButNotAdmin() && request.resource.data.barberId == getCurrentUserBarberId());
+      allow update: if isAdmin() || 
+                      (isBarberButNotAdmin() && resource.data.barberId == getCurrentUserBarberId());
+      allow delete: if isAdmin() || 
+                      (isBarberButNotAdmin() && resource.data.barberId == getCurrentUserBarberId());
     }
 
     // Shop Items Collection
@@ -133,7 +151,8 @@ service cloud.firestore {
     // Notifications
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && isOwner(resource.data.userId);
-      allow write: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if isSignedIn() && isOwner(resource.data.userId);
     }
 
     // Statistics
