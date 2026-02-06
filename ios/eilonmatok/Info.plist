@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.2.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>4</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -81,5 +81,21 @@
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColor</key>
+        <dict>
+            <key>Color Space</key>
+            <string>srgb</string>
+            <key>Red</key>
+            <real>0.0</real>
+            <key>Green</key>
+            <real>0.0</real>
+            <key>Blue</key>
+            <real>0.0</real>
+            <key>Alpha</key>
+            <real>1</real>
+        </dict>
+    </dict>
   </dict>
 </plist>
