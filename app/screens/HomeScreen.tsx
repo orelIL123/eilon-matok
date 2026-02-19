@@ -1,26 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActionSheetIOS,
-    Alert,
-    Animated,
-    Dimensions,
-    ImageBackground,
-    InteractionManager,
-    Linking,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActionSheetIOS,
+  Alert,
+  Animated,
+  Dimensions,
+  ImageBackground,
+  InteractionManager,
+  Linking,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getActiveBroadcastMessages, getCurrentUser, getUserNotifications } from '../../services/firebase';
 import NotificationPanel from '../components/NotificationPanel';
@@ -367,25 +367,29 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       });
 
       // Prefetch critical images (atmosphere, aboutUs) immediately
-      const criticalImages: string[] = [];
-      if (atmosphereImage) criticalImages.push(atmosphereImage);
-      if (aboutUsImage) criticalImages.push(aboutUsImage);
-      
-      if (criticalImages.length > 0) {
-        const { prefetchCriticalImages } = await import('../utils/imagePrefetch');
-        prefetchCriticalImages(criticalImages).catch(err => {
-          console.warn('Failed to prefetch critical images:', err);
+      if (atmosphereImage) {
+        Image.prefetch(atmosphereImage, 'memory-disk').catch(err => {
+          console.warn('Failed to prefetch atmosphere image:', err);
+        });
+      }
+      if (aboutUsImage) {
+        Image.prefetch(aboutUsImage, 'memory-disk').catch(err => {
+          console.warn('Failed to prefetch aboutUs image:', err);
         });
       }
 
-      // Prefetch gallery images with priority - first 3 high priority, rest in batches
-      if (galleryImages.length > 0) {
-        const { prefetchImagesWithPriority } = await import('../utils/imagePrefetch');
-        // Prefetch all gallery images, but prioritize first 3
-        prefetchImagesWithPriority(galleryImages, 3).catch(err => {
-          console.warn('Failed to prefetch gallery images:', err);
-        });
-      }
+      // Prefetch first 8 gallery images for faster initial load using expo-image
+      const imagesToPrefetch = galleryImages.slice(0, 8);
+      console.log(`🖼️ Prefetching first ${imagesToPrefetch.length} gallery images...`);
+      imagesToPrefetch.forEach((imageUrl, index) => {
+        if (imageUrl) {
+          Image.prefetch(imageUrl, 'memory-disk').then(() => {
+            console.log(`✅ Prefetched image ${index + 1}/${imagesToPrefetch.length}`);
+          }).catch(err => {
+            console.warn(`⚠️ Failed to prefetch image ${index + 1}:`, imageUrl, err);
+          });
+        }
+      });
 
       console.log('✅ Loaded Firebase images:', {
         atmosphere: atmosphereImage ? '✅ Found' : '❌ Not found',
@@ -946,14 +950,6 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           setNotificationPanelVisible(false);
           loadNotificationCount(); // Reload count when panel closes
         }}
-        onNotificationRead={() => {
-          // Update count immediately when notification is marked as read
-          setUnreadNotificationCount(prev => Math.max(0, prev - 1));
-        }}
-        onNotificationsCleared={() => {
-          // Set count to 0 when all notifications are cleared
-          setUnreadNotificationCount(0);
-        }}
       />
       <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
 
@@ -970,11 +966,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             onPress={() => setShowImageModal(false)}
           >
             <View style={styles.imageModalContent}>
-              <OptimizedImage
-                source={selectedImage}
+              <Image
+                source={{ uri: selectedImage }}
                 style={styles.fullScreenImage}
                 resizeMode="contain"
-                priority="high"
               />
               <TouchableOpacity
                 style={styles.imageModalCloseButton}

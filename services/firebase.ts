@@ -152,8 +152,6 @@ export interface UserProfile {
   phone: string;
   profileImage?: string;
   isAdmin?: boolean;
-  isBarber?: boolean; // Flag if user is a barber
-  barberId?: string; // Reference to barber profile if isBarber is true
   hasPassword?: boolean; // Added for phone auth with password
   createdAt: Timestamp;
   expoPushToken?: string; // Expo push token for notifications
@@ -186,7 +184,6 @@ export interface Barber {
   phone?: string; // Phone number for contact
   photoUrl?: string; // Photo URL for profile image
   bio?: string; // Biography description
-  isMainBarber?: boolean; // Legacy field for main barber
 }
 
 export interface Treatment {
@@ -450,30 +447,6 @@ const saveAuthDataAfterLogin = async (user: User) => {
 
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
-};
-
-// Get current user's barber ID (if they are a barber)
-export const getCurrentUserBarberId = async (): Promise<string | null> => {
-  const user = getCurrentUser();
-  if (!user) return null;
-  
-  const profile = await getUserProfile(user.uid);
-  
-  // If admin - return null (admins see everything)
-  if (profile?.isAdmin) return null;
-  
-  // If barber - return their barberId
-  return profile?.barberId || null;
-};
-
-// Check if current user should filter by barber (is barber but not admin)
-export const shouldFilterByBarber = async (): Promise<boolean> => {
-  const user = getCurrentUser();
-  if (!user) return false;
-  
-  const profile = await getUserProfile(user.uid);
-  // Filter only if barber but NOT admin
-  return !!(profile?.isBarber && !profile?.isAdmin);
 };
 
 // Get saved login credentials
@@ -2585,84 +2558,6 @@ export const deleteBarberProfile = async (barberId: string) => {
     await CacheUtils.clearBarbers();
   } catch (error) {
     throw error;
-  }
-};
-
-// Convert existing user to barber
-export const convertUserToBarber = async (
-  userId: string,
-  barberData: {
-    name: string;
-    image?: string;
-    specialties: string[];
-    experience: string;
-    rating: number;
-    phone?: string;
-    pricing?: { [treatmentId: string]: number };
-  }
-): Promise<string> => {
-  try {
-    // 1. Create barber profile in barbers collection
-    const barberDocRef = await addDoc(collection(db, 'barbers'), {
-      name: barberData.name,
-      image: barberData.image || '',
-      specialties: barberData.specialties,
-      experience: barberData.experience,
-      rating: barberData.rating,
-      available: true,
-      phone: barberData.phone,
-      pricing: barberData.pricing || {},
-    });
-    
-    const barberId = barberDocRef.id;
-    
-    // 2. Update user profile to mark as barber
-    const userDocRef = doc(db, 'users', userId);
-    await updateDoc(userDocRef, {
-      isBarber: true,
-      barberId: barberId,
-    });
-    
-    // 3. Clear cache
-    await CacheUtils.clearBarbers();
-    
-    // 4. Send notification about new barber
-    try {
-      await sendNewBarberNotification(barberData.name);
-    } catch (notificationError) {
-      console.log('Failed to send new barber notification:', notificationError);
-    }
-    
-    console.log(`✅ User ${userId} converted to barber with ID ${barberId}`);
-    return barberId;
-  } catch (error) {
-    console.error('Error converting user to barber:', error);
-    throw error;
-  }
-};
-
-// Get all users who are NOT barbers (for conversion)
-export const getAllNonBarberUsers = async (): Promise<UserProfile[]> => {
-  try {
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const nonBarberUsers: UserProfile[] = [];
-    
-    usersSnapshot.forEach((doc) => {
-      const userData = doc.data() as UserProfile;
-      // Only include users who are not barbers and not admins
-      if (!userData.isBarber && !userData.isAdmin) {
-        nonBarberUsers.push({
-          uid: doc.id,
-          ...userData
-        });
-      }
-    });
-    
-    console.log(`📋 Found ${nonBarberUsers.length} non-barber users`);
-    return nonBarberUsers;
-  } catch (error) {
-    console.error('Error getting non-barber users:', error);
-    return [];
   }
 };
 
@@ -5157,23 +5052,6 @@ export const markNotificationAsRead = async (notificationId: string): Promise<bo
     return true;
   } catch (error) {
     console.error('Error marking notification as read:', error);
-    return false;
-  }
-};
-
-// Mark multiple notifications as read (batch)
-export const markNotificationsAsRead = async (notificationIds: string[]): Promise<boolean> => {
-  if (!notificationIds.length) return true;
-  try {
-    const batch = writeBatch(db);
-    notificationIds.forEach((id) => {
-      const notificationRef = doc(db, 'notifications', id);
-      batch.update(notificationRef, { isRead: true });
-    });
-    await batch.commit();
-    return true;
-  } catch (error) {
-    console.error('Error marking notifications as read:', error);
     return false;
   }
 };

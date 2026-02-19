@@ -1,27 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  Alert,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { registerUserWithPhone, sendSMSVerification } from '../../services/firebase';
 import { colors } from '../constants/colors';
 import { CONTACT_INFO } from '../constants/contactInfo';
 
 const { width: screenWidth } = Dimensions.get('window');
+
+type RegisterStep = 'fullName' | 'phone' | 'password' | 'verification';
+
+const STEP_ORDER: RegisterStep[] = ['fullName', 'phone', 'password', 'verification'];
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -30,16 +35,28 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'input' | 'verification'>('input');
+  const [step, setStep] = useState<RegisterStep>('fullName');
   const [verificationId, setVerificationId] = useState('');
   const [showTerms, setShowTerms] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const currentStepIndex = useMemo(() => STEP_ORDER.indexOf(step), [step]);
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim, step]);
 
   const handleSendVerification = async () => {
     if (!fullName.trim()) {
       Alert.alert('שגיאה', 'אנא הזן שם מלא');
       return;
     }
-    
+
     if (!phone.trim()) {
       Alert.alert('שגיאה', 'אנא הזן מספר טלפון');
       return;
@@ -60,7 +77,6 @@ export default function RegisterScreen() {
       const result = await sendSMSVerification(phone);
       console.log('📱 Received verificationId:', result.verificationId);
       setVerificationId(result.verificationId);
-      console.log('📱 Set verificationId in state:', result.verificationId);
       setStep('verification');
       Alert.alert('הצלחה', 'קוד אימות נשלח לטלפון שלך');
     } catch (error: any) {
@@ -87,11 +103,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      // Only call registerUserWithPhone - it will handle verification internally
       await registerUserWithPhone(phone, fullName, verificationId, verificationCode, password);
-
-      // Note: Push notifications are not registered automatically on registration
-      // User must explicitly enable notifications via settings or onboarding
 
       Alert.alert('הצלחה', 'נרשמת בהצלחה!', [
         { text: 'אישור', onPress: () => router.replace('/(tabs)') }
@@ -123,149 +135,212 @@ export default function RegisterScreen() {
   };
 
   const handleBack = () => {
-    if (step === 'verification') {
-      setStep('input');
-      setVerificationCode('');
-    } else {
-      // Navigate to auth choice screen instead of using router.back()
-      // This ensures consistent navigation behavior
+    if (step === 'fullName') {
       router.replace('/auth-choice');
+      return;
+    }
+
+    if (step === 'verification') {
+      setVerificationCode('');
+      setStep('password');
+      return;
+    }
+
+    const previousStep = STEP_ORDER[currentStepIndex - 1];
+    if (previousStep) {
+      setStep(previousStep);
     }
   };
 
+  const handleStepSubmit = () => {
+    if (step === 'fullName') {
+      if (!fullName.trim()) {
+        Alert.alert('שגיאה', 'אנא הזן שם מלא');
+        return;
+      }
+      setStep('phone');
+      return;
+    }
+
+    if (step === 'phone') {
+      if (!phone.trim()) {
+        Alert.alert('שגיאה', 'אנא הזן מספר טלפון');
+        return;
+      }
+      setStep('password');
+      return;
+    }
+
+    if (step === 'password') {
+      handleSendVerification();
+      return;
+    }
+
+    handleVerifyAndRegister();
+  };
+
+  const actionText = step === 'verification'
+    ? 'אמת והירשם'
+    : step === 'password'
+      ? 'שלח קוד אימות'
+      : 'המשך';
+
+  const stepTitle = step === 'fullName'
+    ? 'איך קוראים לך?'
+    : step === 'phone'
+      ? 'מה מספר הטלפון שלך?'
+      : step === 'password'
+        ? 'בחר סיסמה לחשבון'
+        : 'אימות מספר טלפון';
+
+  const stepSubtitle = step === 'fullName'
+    ? 'שם מלא יעזור לנו לזהות אותך במערכת'
+    : step === 'phone'
+      ? 'נשלח קוד אימות בהודעת SMS'
+      : step === 'password'
+        ? 'לפחות 6 תווים'
+        : `נשלח קוד אימות ל-${phone}`;
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <Ionicons name="arrow-back" size={22} color="#221a16" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>הרשמה</Text>
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-        {/* Logo */}
-        <View style={styles.logoSection}>
-          <Image 
-            source={require('../../assets/images/icon.png')} 
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        <View style={styles.progressRow}>
+          {STEP_ORDER.map((item, index) => {
+            const isActive = index <= currentStepIndex;
+            return <View key={item} style={[styles.progressItem, isActive && styles.progressItemActive]} />;
+          })}
         </View>
 
-        {step === 'input' ? (
-          <>
-            {/* Title */}
-            <Text style={styles.title}>הרשמה עם מספר טלפון</Text>
-
-            {/* Form */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>שם מלא</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="הזן שם מלא"
-                placeholderTextColor={colors.textSecondary}
-                value={fullName}
-                onChangeText={setFullName}
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.content}>
+            <View style={styles.logoSection}>
+              <Image
+                source={require('../../assets/images/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
               />
-
-              <Text style={styles.label}>מספר טלפון</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="הזן מספר טלפון"
-                placeholderTextColor={colors.textSecondary}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                returnKeyType="next"
-                onSubmitEditing={() => {
-                  // Focus to password field
-                }}
-              />
-
-              <Text style={styles.label}>סיסמא</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="הזן סיסמא (לפחות 6 תווים)"
-                placeholderTextColor={colors.textSecondary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                returnKeyType="go"
-                onSubmitEditing={handleSendVerification}
-              />
-
-              <TouchableOpacity 
-                style={[styles.registerButton, loading && styles.buttonDisabled]} 
-                onPress={handleSendVerification}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.registerButtonText}>שלח קוד אימות</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => router.push('/login')}>
-                <Text style={styles.linkText}>יש לך חשבון? התחבר</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.termsText}>
-                בהמשך השימוש באפליקציה, אתה מסכים ל{' '}
-                <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>תנאי השימוש</Text>
-                {' '}ול{' '}
-                <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>מדיניות הפרטיות</Text>
-              </Text>
             </View>
-          </>
-        ) : (
-          <>
-            {/* Verification Step */}
-            <Text style={styles.title}>אימות מספר טלפון</Text>
-            <Text style={styles.subtitle}>
-              נשלח קוד אימות ל-{phone}
-            </Text>
 
-            <View style={styles.formSection}>
-              <Text style={styles.label}>קוד אימות</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="הזן קוד אימות"
-                placeholderTextColor={colors.textSecondary}
-                value={verificationCode}
-                onChangeText={setVerificationCode}
-                keyboardType="number-pad"
-                maxLength={6}
-                returnKeyType="go"
-                onSubmitEditing={handleVerifyAndRegister}
-              />
+            <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+              <Text style={styles.title}>{stepTitle}</Text>
+              <Text style={styles.subtitle}>{stepSubtitle}</Text>
 
-              <TouchableOpacity 
-                style={[styles.registerButton, loading && styles.buttonDisabled]} 
-                onPress={handleVerifyAndRegister}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.registerButtonText}>אמת והירשם</Text>
+              <View style={styles.formSection}>
+                {step === 'fullName' && (
+                  <>
+                    <Text style={styles.label}>שם מלא</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="הזן שם מלא"
+                      placeholderTextColor="#9b8f88"
+                      value={fullName}
+                      onChangeText={setFullName}
+                      returnKeyType="next"
+                      onSubmitEditing={handleStepSubmit}
+                      textAlign="right"
+                    />
+                  </>
                 )}
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+
+                {step === 'phone' && (
+                  <>
+                    <Text style={styles.label}>מספר טלפון</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="הזן מספר טלפון"
+                      placeholderTextColor="#9b8f88"
+                      value={phone}
+                      onChangeText={setPhone}
+                      keyboardType="phone-pad"
+                      returnKeyType="next"
+                      onSubmitEditing={handleStepSubmit}
+                      textAlign="right"
+                    />
+                  </>
+                )}
+
+                {step === 'password' && (
+                  <>
+                    <Text style={styles.label}>סיסמה</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="הזן סיסמה (לפחות 6 תווים)"
+                      placeholderTextColor="#9b8f88"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      returnKeyType="go"
+                      onSubmitEditing={handleStepSubmit}
+                      textAlign="right"
+                    />
+                  </>
+                )}
+
+                {step === 'verification' && (
+                  <>
+                    <View style={styles.summaryBox}>
+                      <Text style={styles.summaryLabel}>שם מלא: {fullName}</Text>
+                      <Text style={styles.summaryLabel}>טלפון: {phone}</Text>
+                    </View>
+                    <Text style={styles.label}>קוד אימות</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="הזן קוד אימות"
+                      placeholderTextColor="#9b8f88"
+                      value={verificationCode}
+                      onChangeText={setVerificationCode}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      returnKeyType="go"
+                      onSubmitEditing={handleStepSubmit}
+                      textAlign="center"
+                    />
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.registerButton, loading && styles.buttonDisabled]}
+                  onPress={handleStepSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.registerButtonText}>{actionText}</Text>
+                  )}
+                </TouchableOpacity>
+
+                {step !== 'verification' && (
+                  <>
+                    <TouchableOpacity onPress={() => router.push('/login')}>
+                      <Text style={styles.linkText}>יש לך חשבון? התחבר</Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.termsText}>
+                      בהמשך השימוש באפליקציה, אתה מסכים ל{' '}
+                      <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>תנאי השימוש</Text>
+                      {' '}ול{' '}
+                      <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>מדיניות הפרטיות</Text>
+                    </Text>
+                  </>
+                )}
+              </View>
+            </Animated.View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Terms Modal */}
       <Modal visible={showTerms} transparent={true} animationType="fade" onRequestClose={() => setShowTerms(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -277,49 +352,49 @@ export default function RegisterScreen() {
                 • השירות מיועד לקביעת תורים במספרת אילון מתוק{'\n'}
                 • יש לספק מידע מדויק ומלא בעת קביעת התור{'\n'}
                 • המספרה שומרת לעצמה את הזכות לסרב לתת שירות במקרים חריגים{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>2. ביטול תורים{'\n'}</Text>
                 • ביטול תור יש לבצע לפחות 2 שעות לפני מועד התור{'\n'}
                 • ביטול מאוחר יותר מ-2 שעות עלול לחייב תשלום{'\n'}
                 • במקרה של איחור של יותר מ-15 דקות, התור עלול להתבטל{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>3. תשלומים{'\n'}</Text>
                 • התשלום מתבצע במספרה לאחר קבלת השירות{'\n'}
                 • המחירים כפי שמופיעים באפליקציה{'\n'}
                 • המספרה שומרת לעצמה את הזכות לשנות מחירים{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>4. אחריות{'\n'}</Text>
                 • המספרה מתחייבת לאיכות השירות{'\n'}
                 • במקרה של אי שביעות רצון, יש לפנות למנהל המספרה{'\n'}
                 • המספרה לא אחראית לנזקים עקיפים{'\n\n'}
-                
+
                 <Text style={styles.sectionTitle}>מדיניות פרטיות{'\n\n'}</Text>
-                
+
                 <Text style={styles.subsectionTitle}>1. איסוף מידע{'\n'}</Text>
                 • אנו אוספים: שם מלא, מספר טלפון, פרטי תורים{'\n'}
                 • המידע נאסף לצורך מתן השירות בלבד{'\n'}
                 • לא נאסוף מידע מיותר{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>2. שימוש במידע{'\n'}</Text>
                 • המידע משמש לקביעת תורים ותקשורת{'\n'}
                 • לא נשתף את המידע עם צדדים שלישיים{'\n'}
                 • לא נשלח הודעות פרסומיות ללא אישור{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>3. אבטחה{'\n'}</Text>
                 • המידע מאוחסן באופן מאובטח{'\n'}
                 • גישה למידע מוגבלת לעובדי המספרה בלבד{'\n'}
                 • נעדכן את האבטחה לפי הצורך{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>4. זכויות המשתמש{'\n'}</Text>
                 • הזכות לבקש עותק מהמידע שלך{'\n'}
                 • הזכות לבקש מחיקה של המידע{'\n'}
                 • הזכות לעדכן את המידע{'\n\n'}
-                
+
                 <Text style={styles.subsectionTitle}>5. עדכונים{'\n'}</Text>
                 • מדיניות זו עשויה להתעדכן{'\n'}
                 • עדכונים יפורסמו באפליקציה{'\n'}
                 • המשך השימוש מהווה הסכמה לתנאים המעודכנים{'\n\n'}
-                
+
                 <Text style={styles.contactInfo}>
                   {CONTACT_INFO.contactText}{'\n'}
                   מייל: {CONTACT_INFO.email}
@@ -339,123 +414,158 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f0ea',
   },
   keyboardAvoidingView: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e9dfd4',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
+    color: '#1f1a16',
     textAlign: 'center',
   },
   placeholder: {
     width: 40,
   },
+  progressRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  progressItem: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#ddd2c6',
+  },
+  progressItemActive: {
+    backgroundColor: colors.primary,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: 32,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 16,
   },
   logo: {
-    width: screenWidth * 0.18,
-    height: screenWidth * 0.18,
+    width: screenWidth * 0.2,
+    height: screenWidth * 0.2,
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#ebe1d7',
+    shadowColor: '#8B4513',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 5,
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
-    color: '#000000',
-    textAlign: 'center',
-    marginBottom: 20,
+    color: '#1f1a16',
+    textAlign: 'right',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 40,
+    fontSize: 15,
+    color: '#8a7565',
+    textAlign: 'right',
+    marginTop: 6,
+    marginBottom: 22,
+    lineHeight: 21,
   },
   formSection: {
     width: '100%',
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#000000',
+    color: '#2f261f',
     marginBottom: 8,
     textAlign: 'right',
   },
   input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: '#fffaf5',
+    borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 15,
     fontSize: 16,
-    color: '#000000',
-    marginBottom: 20,
-    textAlign: 'right',
+    color: '#1f1a16',
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#e7dacc',
+  },
+  summaryBox: {
+    backgroundColor: '#f5f0ea',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e5d8c9',
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#5c4c3f',
+    textAlign: 'right',
+    marginBottom: 4,
   },
   registerButton: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-    shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginTop: 6,
+    marginBottom: 16,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   registerButtonText: {
     color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   linkText: {
-    fontSize: 16,
+    fontSize: 15,
     color: colors.primary,
     textAlign: 'center',
     textDecorationLine: 'underline',
   },
   termsText: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 13,
+    color: '#756354',
     textAlign: 'center',
     lineHeight: 20,
-    marginTop: 20,
+    marginTop: 14,
   },
   termsLink: {
     color: colors.primary,

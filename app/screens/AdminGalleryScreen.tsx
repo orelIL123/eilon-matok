@@ -207,11 +207,6 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   };
 
   const openAddModal = (type: 'gallery' | 'background' | 'splash' | 'aboutus' | 'treatments') => {
-    // Prevent adding/changing aboutus images
-    if (type === 'aboutus') {
-      showToast('לא ניתן לשנות את תמונת אודותינו', 'error');
-      return;
-    }
     setEditingImage(null);
     setSelectedImageUri(null); // אפס תצוגה מקדימה
     setFormData({
@@ -390,8 +385,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         const newImageId = await addGalleryImage(imageData);
         console.log('✅ Image saved with ID:', newImageId);
         
-        // If background, also update settings/images (overwrites existing)
-        // Note: aboutus images cannot be changed - they are protected
+        // Keep settings/images in sync for single-image sections
         if (formData.type === 'background') {
           const { setDoc, doc, getDoc } = await import('firebase/firestore');
           const { db } = await import('../../config/firebase');
@@ -403,8 +397,18 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             atmosphereImage: imageUrl
           }, { merge: true });
           console.log('✅ Updated atmosphereImage in settings (overwrites existing)');
+        } else if (formData.type === 'aboutus') {
+          const { setDoc, doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('../../config/firebase');
+          const settingsRef = doc(db, 'settings', 'images');
+          const settingsSnap = await getDoc(settingsRef);
+          const currentData = settingsSnap.exists() ? settingsSnap.data() : {};
+          await setDoc(settingsRef, {
+            ...currentData,
+            aboutUsImage: imageUrl
+          }, { merge: true });
+          console.log('✅ Updated aboutUsImage in settings (overwrites existing)');
         }
-        // aboutus images are protected - cannot be changed
         
         setImages(prev => [...prev, { id: newImageId, ...imageData, createdAt: new Date() as any }]);
         showToast('התמונה נוספה בהצלחה');
@@ -917,15 +921,12 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
               <View style={styles.emptyState}>
                 <Ionicons name={getTabIcon(selectedTab) as any} size={64} color="#ccc" />
                 <Text style={styles.emptyStateText}>אין תמונות ב{getTabTitle(selectedTab)}</Text>
-                {/* Hide add button for aboutus - cannot be changed */}
-                {selectedTab !== 'aboutus' && (
-                  <TouchableOpacity 
-                    style={styles.emptyAddButton} 
-                    onPress={() => openAddModal(selectedTab === 'shop' ? 'gallery' : selectedTab)}
-                  >
-                    <Text style={styles.emptyAddButtonText}>הוסף תמונה ראשונה</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity 
+                  style={styles.emptyAddButton} 
+                  onPress={() => openAddModal(selectedTab === 'shop' ? 'gallery' : selectedTab)}
+                >
+                  <Text style={styles.emptyAddButtonText}>הוסף תמונה ראשונה</Text>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>

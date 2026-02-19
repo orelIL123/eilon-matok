@@ -18,10 +18,8 @@ import {
     getActiveBroadcastMessages,
     getCurrentUser,
     getUserNotifications,
-    markNotificationAsRead,
-    markNotificationsAsRead
+    markNotificationAsRead
 } from '../../services/firebase';
-import { useNotificationToast } from './NotificationToastProvider';
 
 const {} = Dimensions.get('window');
 
@@ -38,14 +36,11 @@ interface Notification {
 interface NotificationPanelProps {
   visible: boolean;
   onClose: () => void;
-  onNotificationRead?: () => void; // Callback when notification is marked as read (decrements count by 1)
-  onNotificationsCleared?: () => void; // Callback when all notifications are cleared (sets count to 0)
 }
 
-const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose, onNotificationRead, onNotificationsCleared }) => {
+const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const { showNotificationToast } = useNotificationToast();
 
   // Load notifications when panel opens
   useEffect(() => {
@@ -128,67 +123,58 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose,
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    // Close the panel first
-    onClose();
-    
-        // Mark regular notification as read (before showing toast)
-        if (!notification.isBroadcast && !notification.isRead) {
-          try {
-            await markNotificationAsRead(notification.id);
-            setNotifications(prev =>
-              prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
-            );
-            // Notify parent to update count
-            onNotificationRead?.();
-          } catch (error) {
-            console.error('Error marking notification as read:', error);
-          }
-        }
-    
-    // Small delay to let panel close smoothly, then show toast
-    setTimeout(() => {
-      // If it's a broadcast message, show with dismiss option
-      if (notification.isBroadcast) {
-        showNotificationToast({
-          title: notification.title,
-          message: notification.message,
-          type: 'broadcast',
-          actionLabel: 'לא להציג שוב',
-          onAction: async () => {
-            const user = getCurrentUser();
-            if (user) {
-              await dismissBroadcastMessage(notification.id, user.uid);
-              setNotifications(prev => prev.filter(n => n.id !== notification.id));
+    // If it's a broadcast message, show with dismiss option
+    if (notification.isBroadcast) {
+      Alert.alert(
+        notification.title,
+        notification.message,
+        [
+          { text: 'סגור', style: 'cancel' },
+          {
+            text: 'סמן כנקרא (לא להציג שוב)',
+            style: 'default',
+            onPress: async () => {
+              const user = getCurrentUser();
+              if (user) {
+                await dismissBroadcastMessage(notification.id, user.uid);
+                // Remove from list
+                setNotifications(prev => prev.filter(n => n.id !== notification.id));
+              }
             }
-          },
-        });
-      } else {
-        showNotificationToast({
-          title: notification.title,
-          message: notification.message,
-          type: notification.type === 'appointment' ? 'info' : 'success',
-        });
+          }
+        ]
+      );
+    } else {
+      // Mark regular notification as read
+      if (!notification.isRead) {
+        try {
+          await markNotificationAsRead(notification.id);
+          setNotifications(prev =>
+            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+          );
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+        }
       }
-    }, 200);
+
+      Alert.alert(
+        notification.title,
+        notification.message,
+        [{ text: 'סגור', style: 'default' }]
+      );
+    }
   };
 
   const handleMarkAllRead = async () => {
     try {
-      const unreadNotifications = notifications.filter(n => !n.isRead && !n.isBroadcast);
-      const unreadCount = unreadNotifications.length;
-      if (unreadCount > 0) {
-        const notificationIds = unreadNotifications.map(n => n.id);
-        await markNotificationsAsRead(notificationIds);
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        // Notify parent to update count (call once for each notification)
-        for (let i = 0; i < unreadCount; i++) {
-          onNotificationRead?.();
-        }
-        Alert.alert('התראות', 'כל ההתראות סומנו כנקראו');
+      const unreadNotifications = notifications.filter(n => !n.isRead);
+      for (const notification of unreadNotifications) {
+        await markNotificationAsRead(notification.id);
       }
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      Alert.alert('התראות', 'כל ההתראות סומנו כנקראו');
     } catch (error) {
       console.error('Error marking all as read:', error);
-      Alert.alert('שגיאה', 'לא ניתן לסמן את כל ההתראות כנקראו. בדוק את ההרשאות.');
     }
   };
 
@@ -205,18 +191,11 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose,
             try {
               const user = getCurrentUser();
               if (user) {
-                const success = await clearAllUserNotifications(user.uid);
-                if (success) {
-                  setNotifications([]);
-                  // Notify parent that all notifications are cleared
-                  onNotificationsCleared?.();
-                } else {
-                  Alert.alert('שגיאה', 'לא ניתן למחוק את ההתראות. בדוק את ההרשאות.');
-                }
+                await clearAllUserNotifications(user.uid);
+                setNotifications([]);
               }
             } catch (error) {
               console.error('Error clearing notifications:', error);
-              Alert.alert('שגיאה', 'אירעה שגיאה בעת מחיקת ההתראות.');
             }
           }
         }
@@ -296,8 +275,6 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ visible, onClose,
                           setNotifications(prev =>
                             prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
                           );
-                          // Notify parent to update count
-                          onNotificationRead?.();
                         } catch (error) {
                           console.error('Error marking notification as read:', error);
                         }

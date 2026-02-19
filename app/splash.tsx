@@ -1,26 +1,16 @@
 import { useRouter } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { Animated, Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { authManager } from '../services/authManager';
-
-// Keep the native splash screen visible while we're loading
-ExpoSplashScreen.preventAutoHideAsync();
 
 export default function SplashScreen() {
   const router = useRouter();
-  const fadeAnim = React.useRef(new Animated.Value(1)).current; // Start at 1 (visible immediately)
 
   useEffect(() => {
-    // Hide native splash screen immediately when component mounts
-    // The expo splash is already visible (opacity 1) so transition is seamless
-    ExpoSplashScreen.hideAsync().catch(() => {
-      // Ignore errors if splash is already hidden
-    });
-
-    // Track start time to ensure minimum 2 seconds display
+    // Track start time to ensure minimum 3 seconds display
     const startTime = Date.now();
-    const MINIMUM_DISPLAY_TIME = 2000; // 2 seconds
+    const MINIMUM_DISPLAY_TIME = 3000; // 3 seconds
 
     // Check auth state using the new AuthManager
     let authStateChecked = false;
@@ -54,25 +44,23 @@ export default function SplashScreen() {
         const remainingTime = Math.max(0, MINIMUM_DISPLAY_TIME - elapsedTime);
 
         const navigate = (route: '/(tabs)' | '/auth-choice') => {
+          const proceed = async () => {
+            try {
+              await ExpoSplashScreen.hideAsync();
+            } catch {
+              // splash may already be hidden
+            }
+            router.replace(route);
+          };
+
           if (remainingTime > 0) {
             setTimeout(() => {
-              Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }).start(() => {
-                router.replace(route);
-              });
+              proceed();
             }, remainingTime);
-          } else {
-            Animated.timing(fadeAnim, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(() => {
-              router.replace(route);
-            });
+            return;
           }
+
+          proceed();
         };
 
         if (isAuthenticated) {
@@ -100,49 +88,33 @@ export default function SplashScreen() {
         const elapsedTime = Date.now() - startTime;
         const remainingTime = Math.max(0, MINIMUM_DISPLAY_TIME - elapsedTime);
 
+        const proceed = async () => {
+          try {
+            await ExpoSplashScreen.hideAsync();
+          } catch {
+            // splash may already be hidden
+          }
+          router.replace('/auth-choice');
+        };
+
         if (remainingTime > 0) {
           setTimeout(() => {
-            Animated.timing(fadeAnim, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(() => {
-              router.replace('/auth-choice');
-            });
+            proceed();
           }, remainingTime);
-        } else {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            router.replace('/auth-choice');
-          });
+          return;
         }
+
+        proceed();
       }
     };
 
     // Start auth check immediately (minimum display time will be enforced)
     checkAuthState();
-  }, []);
+  }, [router]);
 
   return (
     <View style={styles.container}>
-      {/* Main splash image - full screen */}
-      <Animated.View
-        style={[
-          styles.imageContainer,
-          {
-            opacity: fadeAnim,
-          },
-        ]}
-      >
-        <Image
-          source={require('../assets/images/splash.png')}
-          style={styles.image}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      {/* Native splash stays visible until hideAsync; keep black fallback under it */}
     </View>
   );
 }
@@ -150,25 +122,6 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
     backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
   },
 });
