@@ -2,7 +2,7 @@
   "expo": {
     "name": "eilon matok",
     "slug": "eilon-matok",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "barberapp",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.eilonmatok.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "googleServicesFile": "./app/GoogleService-Info.plist",
       "config": {
         "usesNonExemptEncryption": false

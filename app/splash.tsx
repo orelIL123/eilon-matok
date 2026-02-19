@@ -1,13 +1,18 @@
 import { useRouter } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { authManager } from '../services/authManager';
 
 export default function SplashScreen() {
   const router = useRouter();
 
   useEffect(() => {
+    // Hide native splash and render our full-screen splash UI immediately.
+    ExpoSplashScreen.hideAsync().catch(() => {
+      // splash may already be hidden
+    });
+
     // Track start time to ensure minimum 3 seconds display
     const startTime = Date.now();
     const MINIMUM_DISPLAY_TIME = 3000; // 3 seconds
@@ -114,7 +119,11 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Native splash stays visible until hideAsync; keep black fallback under it */}
+      <Image
+        source={require('../assets/images/splash.png')}
+        style={styles.image}
+        resizeMode="cover"
+      />
     </View>
   );
 }
@@ -123,5 +132,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
 });
