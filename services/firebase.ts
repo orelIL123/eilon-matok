@@ -1,5 +1,3 @@
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import {
     createUserWithEmailAndPassword,
     EmailAuthProvider,
@@ -17,6 +15,7 @@ import {
     addDoc,
     arrayUnion,
     collection,
+    deleteField,
     deleteDoc,
     doc,
     getDoc,
@@ -39,11 +38,13 @@ import { isValidDuration, SLOT_SIZE_MINUTES } from '../app/constants/scheduling'
 import { auth, db, functions, storage } from '../config/firebase';
 import { AuthStorageService } from './authStorage';
 import { CacheUtils } from './cache';
-import { cancelAppointmentReminders as cancelLocalAppointmentReminders, cleanupNotificationsOnLogout, scheduleAppointmentReminders as scheduleLocalAppointmentReminders } from './notifications';
+import { cancelAppointmentReminders as cancelLocalAppointmentReminders, cleanupNotificationsOnLogout, registerPushTokenForUser, scheduleAppointmentReminders as scheduleLocalAppointmentReminders } from './notifications';
 // Removed ImageOptimizer import - using simple upload only
 
 // Export db for use in other components
 export { db };
+
+const EXPO_ACCESS_TOKEN = '9VW_oPjm0D2ywGnVg8ZyqfxC9KBPvo63-wYm3KQM';
 
 // Create admin user function for development/first setup
 export const createAdminUser = async (email: string, password: string, displayName: string, phone: string): Promise<boolean> => {
@@ -3865,43 +3866,9 @@ export const registerForPushNotifications = async (userId: string) => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3613',message:'registerForPushNotifications called',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    // Check if device supports notifications
-    if (!Device.isDevice) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3617',message:'Not a physical device',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      console.log('📱 Not a physical device, skipping push notification registration');
-      return null;
-    }
-
-    // Check existing permissions (don't request)
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3622',message:'Permission status checked',data:{userId,status:existingStatus},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-
-    if (existingStatus !== 'granted') {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3624',message:'Permissions not granted',data:{userId,status:existingStatus},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      console.log('❌ Push notification permissions not granted - user must enable notifications first');
-      return null;
-    }
-
-    // Get push token with projectId
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: '518e7344-df67-42cd-8107-502bd3e48357',
-    });
-    const token = tokenData.data;
+    const token = await registerPushTokenForUser(userId);
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3630',message:'Push token obtained',data:{userId,token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    console.log('📱 Push token:', token);
-
-    // Save token to user profile
-    await updateUserProfile(userId, { expoPushToken: token });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3634',message:'Push token saved to profile',data:{userId,token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
 
     return token;
@@ -3914,7 +3881,50 @@ export const registerForPushNotifications = async (userId: string) => {
   }
 };
 
-export const sendPushNotification = async (pushToken: string, title: string, body: string, data?: any) => {
+const extractExpoPushError = (responseData: any): { details?: string; error?: string } | null => {
+  const entries = Array.isArray(responseData?.data) ? responseData.data : [responseData?.data];
+
+  for (const entry of entries) {
+    if (!entry) continue;
+    if (entry.status === 'ok') continue;
+
+    return {
+      details: entry.details?.error,
+      error: entry.message || entry.details?.error || entry.error,
+    };
+  }
+
+  if (responseData?.errors?.length) {
+    const firstError = responseData.errors[0];
+    return {
+      details: firstError?.details?.error,
+      error: firstError?.message || firstError?.code,
+    };
+  }
+
+  return null;
+};
+
+const clearInvalidPushToken = async (userId?: string, pushToken?: string) => {
+  if (!userId) {
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      expoPushToken: deleteField(),
+      pushToken: deleteField(),
+      pushTokenUpdatedAt: new Date().toISOString(),
+      lastInvalidPushToken: pushToken || null,
+      lastPushTokenErrorAt: new Date().toISOString(),
+    });
+    console.log(`🧹 Cleared invalid push token for user ${userId}`);
+  } catch (cleanupError) {
+    console.error('Failed to clear invalid push token:', cleanupError);
+  }
+};
+
+export const sendPushNotification = async (pushToken: string, title: string, body: string, data?: any, userId?: string) => {
   try {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3643',message:'sendPushNotification called',data:{pushToken:pushToken.substring(0,20)+'...',title,body},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -3932,14 +3942,22 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       headers: {
         Accept: 'application/json',
         'Accept-encoding': 'gzip, deflate',
+        Authorization: `Bearer ${EXPO_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(message),
     });
-    // #region agent log
     const responseData = await response.json();
+    const expoError = extractExpoPushError(responseData);
     fetch('http://127.0.0.1:7242/ingest/a5ce6353-7cba-4d8f-9244-36e2c1e2b80b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'firebase.ts:3661',message:'Push notification API response',data:{status:response.status,response:responseData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
+
+    if (!response.ok || expoError) {
+      if (expoError?.details === 'DeviceNotRegistered') {
+        await clearInvalidPushToken(userId, pushToken);
+      }
+
+      throw new Error(expoError?.error || `Expo push request failed with status ${response.status}`);
+    }
 
     console.log('✅ Push notification sent successfully');
   } catch (error) {
@@ -3969,7 +3987,7 @@ export const sendNotificationToUser = async (userId: string, title: string, body
       // Don't fail send if migration fails
     }
 
-    await sendPushNotification(token, title, body, data);
+    await sendPushNotification(token, title, body, data, userId);
     return true;
   } catch (error) {
     console.error('Error sending notification to user:', error);
@@ -4050,7 +4068,7 @@ export const sendNotificationToAllUsers = async (title: string, body: string, da
     const pushResults = await Promise.allSettled(
       usersWithTokens.map(user => {
         const token = user.expoPushToken || user.pushToken;
-        return token ? sendPushNotification(token, title, body, data) : Promise.resolve();
+        return token ? sendPushNotification(token, title, body, data, user.uid) : Promise.resolve();
       })
     );
 
@@ -4480,31 +4498,46 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
     
     console.log(`✅ Notification enabled for type "${notificationType}": "${title}"`);
     
-    // Try to get current user's profile directly if they're admin
-    const currentUser = getCurrentUser();
     let adminUsers: UserProfile[] = [];
-    
-    if (currentUser) {
-      const currentUserProfile = await getUserProfile(currentUser.uid);
-      if (currentUserProfile?.isAdmin && (currentUserProfile?.expoPushToken || currentUserProfile?.pushToken)) {
-        adminUsers.push(currentUserProfile);
-        console.log(`👨‍💼 Current user is admin with expoPushToken: ${currentUserProfile.displayName}`);
-      }
-    }
-    
-    // Also try to get all users (fallback)
+
+    // Query admin users directly instead of loading the entire users collection.
     try {
-      const users = await getAllUsers();
-      console.log(`👥 Total users found: ${users.length}`);
-      const allAdminUsers = users.filter(user => user.isAdmin && (user.expoPushToken || user.pushToken));
-      // Merge without duplicates
-      allAdminUsers.forEach(user => {
-        if (!adminUsers.find(existing => existing.uid === user.uid)) {
-          adminUsers.push(user);
+      const adminsQuery = query(collection(db, 'users'), where('isAdmin', '==', true));
+      const adminSnapshot = await getDocs(adminsQuery);
+
+      adminUsers = adminSnapshot.docs
+        .map((adminDoc) => ({ uid: adminDoc.id, ...adminDoc.data() } as UserProfile))
+        .filter(user => user.expoPushToken || user.pushToken);
+
+      console.log(`👨‍💼 Admin users fetched directly: ${adminUsers.length}`);
+    } catch (adminQueryError: any) {
+      console.log('⚠️ Direct admin query failed, falling back to broader lookup:', adminQueryError.message);
+    }
+
+    // Fallback: if direct query failed or returned no admins, reuse existing broader lookup.
+    if (adminUsers.length === 0) {
+      const currentUser = getCurrentUser();
+
+      if (currentUser) {
+        const currentUserProfile = await getUserProfile(currentUser.uid);
+        if (currentUserProfile?.isAdmin && (currentUserProfile?.expoPushToken || currentUserProfile?.pushToken)) {
+          adminUsers.push(currentUserProfile);
+          console.log(`👨‍💼 Current user is admin with expoPushToken: ${currentUserProfile.displayName}`);
         }
-      });
-    } catch (getAllUsersError: any) {
-      console.log('⚠️ Could not get all users, using current user only:', getAllUsersError.message);
+      }
+
+      try {
+        const users = await getAllUsers();
+        console.log(`👥 Total users found: ${users.length}`);
+        const allAdminUsers = users.filter(user => user.isAdmin && (user.expoPushToken || user.pushToken));
+        allAdminUsers.forEach(user => {
+          if (!adminUsers.find(existing => existing.uid === user.uid)) {
+            adminUsers.push(user);
+          }
+        });
+      } catch (getAllUsersError: any) {
+        console.log('⚠️ Could not get all users in fallback mode:', getAllUsersError.message);
+      }
     }
     
     console.log(`👨‍💼 Admin users with push tokens: ${adminUsers.length}`);
@@ -4523,7 +4556,7 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
           console.log(`📱 Sending to admin: ${user.displayName} (${user.uid})`);
           const token = user.expoPushToken || user.pushToken;
           if (!token) throw new Error('No push token (expoPushToken/pushToken)');
-          return await sendPushNotification(token, title, body, data);
+          return await sendPushNotification(token, title, body, data, user.uid);
         } catch (error) {
           console.error(`❌ Failed to send to admin ${user.displayName}:`, error);
           throw error;

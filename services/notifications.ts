@@ -11,7 +11,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { deleteField, doc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { db } from '../config/firebase';
 
@@ -147,7 +147,7 @@ export async function ensureAndroidChannel(): Promise<void> {
  * Only registers if permissions are already granted (does not request permissions)
  * @param uid - Firebase user ID
  */
-export async function registerPushTokenForUser(uid: string): Promise<void> {
+export async function registerPushTokenForUser(uid: string): Promise<string | null> {
   try {
     console.log('🔄 Registering push token for user:', uid);
 
@@ -166,19 +166,33 @@ export async function registerPushTokenForUser(uid: string): Promise<void> {
 
     console.log('📱 Push token obtained:', token);
 
-    // Save to Firestore
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      expoPushToken: token,
-      // Backward compatibility with older app versions / server code
-      pushToken: token,
-      pushTokenUpdatedAt: new Date().toISOString(),
-    });
+    const userSnap = await getDoc(userRef);
+    const currentToken = userSnap.exists()
+      ? (userSnap.data().expoPushToken || userSnap.data().pushToken || null)
+      : null;
+
+    const updates: Record<string, any> = {
+      lastPushTokenCheckAt: new Date().toISOString(),
+    };
+
+    if (currentToken !== token) {
+      updates.expoPushToken = token;
+      updates.pushToken = token;
+      updates.pushTokenUpdatedAt = new Date().toISOString();
+      console.log(currentToken ? '🔁 Push token changed, updating stored token' : '🆕 Saving first push token for user');
+    } else {
+      console.log('ℹ️ Push token unchanged, refreshing validation timestamp only');
+    }
+
+    await updateDoc(userRef, updates);
 
     console.log('✅ Push token registered successfully');
+    return token;
   } catch (error) {
     console.error('❌ Error registering push token:', error);
     // Don't throw - registration can fail silently without breaking the app
+    return null;
   }
 }
 

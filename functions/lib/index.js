@@ -4,6 +4,7 @@ exports.processScheduledReminders = exports.updateEmailAndSendReset = exports.de
 const admin = require("firebase-admin");
 const functions = require("firebase-functions");
 admin.initializeApp();
+const EXPO_ACCESS_TOKEN = '9VW_oPjm0D2ywGnVg8ZyqfxC9KBPvo63-wYm3KQM';
 exports.deleteUserAuth = functions.https.onCall(async (data, context) => {
     var _a, _b;
     if (!context.auth) {
@@ -201,6 +202,7 @@ exports.processScheduledReminders = functions.pubsub
                     headers: {
                         'Accept': 'application/json',
                         'Accept-encoding': 'gzip, deflate',
+                        'Authorization': `Bearer ${EXPO_ACCESS_TOKEN}`,
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({

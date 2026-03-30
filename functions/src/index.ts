@@ -3,6 +3,8 @@ import * as functions from 'firebase-functions';
 
 admin.initializeApp();
 
+const EXPO_ACCESS_TOKEN = '9VW_oPjm0D2ywGnVg8ZyqfxC9KBPvo63-wYm3KQM';
+
 export const deleteUserAuth = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
@@ -236,6 +238,7 @@ export const processScheduledReminders = functions.pubsub
               headers: {
                 'Accept': 'application/json',
                 'Accept-encoding': 'gzip, deflate',
+                'Authorization': `Bearer ${EXPO_ACCESS_TOKEN}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
